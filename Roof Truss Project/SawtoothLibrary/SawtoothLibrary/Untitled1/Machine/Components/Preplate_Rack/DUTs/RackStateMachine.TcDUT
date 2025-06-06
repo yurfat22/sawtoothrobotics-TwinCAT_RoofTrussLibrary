@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="RackStateMachine" Id="{1a296bdc-b66f-41a6-86ec-6eef50b71dcb}">
+    <Declaration><![CDATA[TYPE
+    RackStateMachine : STRUCT
+        nState       : INT;
+        button_input : BOOL;
+        button_light : BOOL;
+        door_lock    : BOOL;
+        door_closed  : BOOL;
+        RisingEdge   : R_TRIG;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

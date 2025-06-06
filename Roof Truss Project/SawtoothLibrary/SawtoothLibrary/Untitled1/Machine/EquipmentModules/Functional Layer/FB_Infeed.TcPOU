@@ -1,0 +1,1218 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Infeed" Id="{40a9a850-d47c-4766-afb1-4c1dceabdb54}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Infeed EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    ipSubModules_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_PackML_BaseModule := [];
+
+    // Component definitions here
+    LengthCheckSensorMed  : FB_DigitalSensor := (Name := 'LengthCheckSensorLong');
+    LengthCheckSensorLong  : FB_DigitalSensor := (Name := 'LengthCheckSensorLong');
+
+    InfeedMotor        : FB_Component_ABB_VFD_EIP                                := (Name := 'InfeedMotor');
+    Gate               : FB_DoubleSolenoidFeedback                       := (Name := 'Gate');
+    CenteringClamp     : ARRAY[1..2] OF FB_DoubleSolenoidRetractFeedback := [(Name := 'Clamp_1'), (Name := 'Clamp_2')];
+    BoardPresentSensor : FB_DigitalSensor                                := (Name := 'BoardPresentSensor');
+    BoardEjectSensor   : FB_DigitalSensor                                := (Name := 'BoardEjectSensor');
+
+    //Data for recipe
+
+    _MoveClearActive                     : BOOL;
+    _CarriageClearOfBoardPresentSensor   : BOOL;
+    _IgnoreDoublePick                    : BOOL;
+    _InfeedIgnoreDoublePick_Request      : BOOL;
+    _InfeedIgnoreDoublePick_Acknowledged : BOOL;
+
+    //Alarm Triggers
+
+    InfeedTimeoutAlarm : BOOL;
+
+    InfeedNotResettingAlarm : BOOL;
+    _InfeedToInfeedRequest  : BOOL;
+    _InfeedToInfeedReady    : BOOL;
+    BoardRequested          : BOOL;
+    BoardReleaseRequested   : BOOL;
+    InfeedState_Simp        : E_INFEED_STATES;
+END_VAR
+
+VAR CONSTANT
+
+    // Reports 
+
+    FAULT : INT := 1;
+
+    // Alarms
+
+    PULL_WHEELS_ALARM_COUNT : INT   := 5;
+    MinGearInLength         : REAL  := 3657.6;
+    INFEED_ALARMS_COUNT     : USINT := 10;
+END_VAR
+
+VAR
+
+    InfeedAlarms : ARRAY[1..INFEED_ALARMS_COUNT] OF FB_TcAlarm;
+
+    InfeedState : E_Infeed_States;
+
+    _CSVStep : REFERENCE TO ST_CSV_Step;
+
+    _ReadyForBoard : BOOL;
+
+    _CarriageTookBoard : BOOL;
+
+    _StepComplete : BOOL;
+
+    _BoardDropped : BOOL;
+
+    _BoardCleardInfeed : BOOL;
+
+    _BoardReadyForCarriage : BOOL;
+
+    _TestExecute : BOOL;
+
+    _clearinfeed : BOOL;
+
+    Carriage1ReleaseRequest : BOOL;
+
+    RequestBoard : BOOL;
+
+    _BoardDataToPass : ST_BoardData;
+
+    DataConfirmationNeeded : BOOL;
+
+    DataConfirmationNeeded_State : USINT;
+
+    _Carriage1ResetInfeed_Request : BOOL;
+
+    _Carriage2ResetInfeed_Request : BOOL;
+
+    DataReady : BOOL;
+
+    _Debounce_Mode       : E_DebounceMode := E_DebounceMode.SimpleFlickerFilter;
+    _Debounce_Time       : TIME           := T#1000MS;
+    _Debounce_Time_Short : TIME           := T#500MS;
+
+    _Sim_InfeedClear : BOOL;
+
+    _LineNumber : INT;
+
+	_ActiveInfeedMoving : BOOL;
+	
+    _CurrentParentState : E_PMLState;
+	
+	_Carriage1LengthTesting : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{16ad9d1d-bea2-40de-a4cf-855c9cfbc746}" />
+    <Folder Name="Methods" Id="{1156f709-81cb-4a7f-93a0-0907e22fa460}">
+      <Folder Name="Acting States" Id="{4ea4755c-bc97-4aac-b6e0-0cbde94edf8d}" />
+      <Folder Name="CommandSteps" Id="{a3c9a6fd-59d0-49bb-b295-9acb347f0ef5}" />
+      <Folder Name="Waiting States" Id="{07274643-a15b-4c55-882c-f1b9b1944b5f}" />
+    </Folder>
+    <Folder Name="Properties" Id="{123b6b47-2c50-4dd8-b159-b5ddae2887d5}" />
+    <Method Name="Aborting" Id="{e8f676ec-de47-4c76-a21f-6b95750db563}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Holding</b> state*)
+METHOD PROTECTED Aborting]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[InfeedMotor.Stop();
+CenteringClamp[1].Retract();
+CenteringClamp[2].Retract();
+Gate.Retract();
+
+SUPER^.Aborting();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ActiveInfeedMoving" Id="{6585b2da-b795-4b28-b2c8-0c52c0ddc59d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ActiveInfeedMoving : Bool]]></Declaration>
+      <Get Name="Get" Id="{17735f35-04ac-49a9-ba54-c9a1e8d46ea7}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ActiveInfeedMoving := _ActiveInfeedmoving;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{ef33b03f-57fa-4762-ad33-b54c918deabb}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ActiveInfeedMoving := ActiveInfeedmoving;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Auto" Id="{3f83ffde-c165-4e69-967a-a36fb805b644}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Auto : BOOL
+VAR_INPUT
+END_VAR
+
+VAR
+    result : USINT;
+END_VAR
+
+VAR_INST
+    Previous_State           : E_Infeed_States;
+    DoublePick_SubState      : E_Double_Pick_States;
+    Previous_SubState        : E_Double_Pick_States;
+    DoublePickSensorOverride : BOOL;
+    IgnoreDP_F_TRIG          : F_TRIG;
+    AlarmTON                 : TON;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// State Machine Logic
+_ActiveInfeedMoving := FALSE;
+
+IgnoreDP_F_TRIG(CLK := _InfeedIgnoreDoublePick_Request);
+
+IF IgnoreDP_F_TRIG.Q THEN
+    _InfeedIgnoreDoublePick_Acknowledged := FALSE;
+END_IF
+
+CASE InfeedState OF
+    INF_IDLE: //IDLE
+        AlarmTON(IN := TRUE, PT := T#5S);
+        BoardRequested := FALSE;
+
+        IF _CarriageTookBoard THEN
+            _StepComplete := TRUE;
+        ELSE
+            IF NOT BoardEjectSensor.Active AND
+               NOT BoardPresentSensor.Active AND
+               _StepComplete = FALSE AND
+               _MoveClearActive = FALSE AND
+               DataReady = TRUE AND
+               _BoardDataToPass.BoardID <> '' THEN
+                InfeedState        := INF_CONVEY;
+                _BoardCleardInfeed := TRUE;
+                AlarmTON(IN := FALSE);
+            END_IF
+        END_IF
+
+        InfeedNotResettingAlarm := AlarmTON.Q;
+
+    INF_CONVEY: //Convey
+
+        IF BoardRequested = FALSE AND _InSimulation = FALSE THEN
+            AlarmTON(IN := FALSE);
+
+            IF _LineNumber = 1 THEN
+                //WS_MBI
+                IF WaitSync_Handler(E_WaitSync.INFEED1_MBI_DROP_BOARD) THEN
+                    BoardRequested := TRUE;
+                END_IF
+            ELSIF _LineNumber = 2 THEN
+                //WS_Infeed2
+                IF WaitSync_Handler(E_WaitSync.INFEED2_MBI_DROP_BOARD) THEN
+                    BoardRequested := TRUE;
+                END_IF
+            END_IF
+        ELSE
+            AlarmTON(IN := TRUE, PT := T#20S);
+            Gate.Extend();
+
+            FOR i := 1 TO 2 DO
+                CenteringClamp[i].Retract();
+            END_FOR
+
+            IF Gate.Extended AND CenteringClamp[1].Retracted AND CenteringClamp[2].Retracted THEN
+                InfeedMotor.Jog(JogFW := TRUE);
+                _ActiveInfeedMoving := TRUE;
+            ELSE
+                BoardPresentSensor.Reset();
+            END_IF
+
+            IF BoardPresentSensor.Active AND _CarriageClearOfBoardPresentSensor = TRUE THEN
+                InfeedState := INF_BOARD_FOUND;
+                AlarmTON(IN := FALSE);
+            END_IF
+
+            InfeedTimeoutAlarm := AlarmTON.Q;
+
+            IF InfeedTimeoutAlarm THEN
+                RaiseMessageBox(Header   := 'Board stuck in infeed',
+                                Message1 := 'Board dropped in to infeed and is not moving forward',
+                                Message2 := 'Manually push board forward to continue');
+            END_IF
+        END_IF
+
+    INF_BOARD_FOUND: //Board Found
+        FOR i := 1 TO 2 DO
+            CenteringClamp[i].Extend();
+        END_FOR
+
+        IF InfeedMotor.Stop() AND CenteringClamp[1].Extended AND CenteringClamp[2].Extended THEN
+            InfeedState := INF_BOARD_CHECK;
+        END_IF
+
+    INF_BOARD_CHECK: //Board Check?  
+        IF BoardPresentSensor.Active THEN
+            InfeedState := INF_ROUGH_LENGTH_CHECK;
+        ELSE
+            FOR i := 1 TO 2 DO
+                CenteringClamp[i].Retract();
+            END_FOR
+
+            result := RaiseMessageBox(Header   := 'Board not found at Infeed!',
+                                      Message1 := 'Infeed has secured a board and now it does not see a board',
+                                      Message2 := 'Select Retry to start infeed again and pull board forward',
+                                      Message3 := 'Select Override to tell carriage 1 to grab the board anyways',
+                                      Message4 := 'WARNING if you get this message there is a potential sensor issue',
+                                      Message5 := 'Check sensor at infeed to make sure its working properly',
+                                      Message6 := 'If you select Retry from MBI it will drop a new board from MBI ',
+                                      Btn1     := 'Retry',
+                                      Btn2     := 'Retry from MBI',
+                                      Btn3     := 'Override');
+
+            IF result = 1 THEN
+                InfeedState := INF_CONVEY;
+            ELSIF result = 2 THEN
+                BoardRequested := FALSE;
+                InfeedState    := INF_CONVEY;
+            ELSIF result = 3 THEN
+                InfeedState := INF_ROUGH_LENGTH_CHECK;
+            END_IF
+        END_IF
+
+    INF_ROUGH_LENGTH_CHECK: //Board Check?  
+        IF RoughLengthCheck() OR _InSimulation THEN
+            InfeedState := INF_BOARD_READY;
+        ELSE
+            FOR i := 1 TO 2 DO
+                CenteringClamp[i].Retract();
+            END_FOR
+
+            result := RaiseMessageBox(Header   := 'Wrong board in Infeed conveyor',
+                                      Message1 := CONCAT('Board expected: ', _BoardDataToPass.BoardID),
+                                      Message2 := CONCAT('Length expected: ', LengthFormatString(_BoardDataToPass.BoardLength)),
+                                      Message3 := 'Select Retry to start infeed again and pull board forward',
+                                      Message4 := 'Select Override to tell carriage 1 to grab the board anyways',
+                                      Message5 := 'WARNING if you get this message there is a potential sensor issue',
+                                      Message6 := 'Check length sensors in the infeed to make sure its working properly',
+                                      Message7 := 'If you select Retry from MBI it will drop a new board from MBI ',
+                                      Btn1     := 'Retry',
+                                      Btn2     := 'Retry from MBI',
+                                      Btn3     := 'Override');
+
+            IF result = 1 THEN
+                InfeedState := INF_CONVEY;
+            ELSIF result = 2 THEN
+                BoardRequested := FALSE;
+                InfeedState    := INF_CONVEY;
+            ELSIF result = 3 THEN
+                InfeedState := INF_BOARD_READY;
+            END_IF
+        END_IF
+
+    INF_BOARD_READY: //Board Ready
+        _InfeedToInfeedRequest := FALSE;
+        _ReadyForBoard         := FALSE;
+
+        FOR i := 1 TO 2 DO
+            CenteringClamp[i].Extend();
+        END_FOR
+
+        IF CenteringClamp[1].Extended AND CenteringClamp[2].Extended THEN
+            _BoardReadyForCarriage := TRUE;
+            InfeedState            := INF_BOARD_READY_WS;
+        END_IF
+
+    INF_BOARD_READY_WS: // handshake with carriage 1 to let him know board's ready
+        Gate.Retract();
+
+        IF WaitSync_Handler(E_WaitSync.CARRIAGE1_INFEED_BOARD_READY) THEN
+            InfeedState := INF_BOARD_PICKING_WS;
+        END_IF
+
+    INF_BOARD_PICKING_WS:
+        Gate.Retract();
+
+        IF WaitSync_Handler(E_WaitSync.CARRIAGE1_INFEED_PICKING) THEN
+            InfeedState := INF_RETRACT_CLAMPS;
+        END_IF
+
+    INF_RETRACT_CLAMPS:
+        Gate.Retract();
+
+        FOR i := 1 TO 2 DO
+            CenteringClamp[i].Retract();
+        END_FOR
+
+        IF CenteringClamp[1].Retracted AND CenteringClamp[2].Retracted AND Gate.Retracted THEN
+
+            InfeedState := INF_BOARD_PICKED_WS;
+        END_IF
+
+    INF_BOARD_PICKED_WS: // last step on normal boards, DataConfirmationNeeded is the handshake for ExecuteStep to get new data
+        IF WaitSync_Handler(E_WaitSync.CARRIAGE1_INFEED_BOARD_PICKED) THEN
+            _CarriageTookBoard       := TRUE;
+            _IgnoreDoublePick        := FALSE;
+            DoublePickSensorOverride := FALSE;
+
+            InfeedState := INF_BOARD_LENGTH_CHECK_CAR1;
+        END_IF
+
+    INF_BOARD_LENGTH_CHECK_CAR1:
+        IF WaitSync_Handler(E_WaitSync.CARRIAGE1_INFEED_BOARD_LENGTH_CHECK) THEN
+            IF _BoardDataToPass.DoublePickNeeded THEN
+                InfeedState := INF_DOUBLE_PICK;
+            ELSE
+                InfeedState            := INF_IDLE;
+                DataConfirmationNeeded := TRUE;
+            END_IF
+        ELSIF _Carriage1ResetInfeed_Request THEN
+            InfeedState    := INF_CONVEY;
+            BoardRequested := FALSE;
+        END_IF
+
+    INF_DOUBLE_PICK:
+        // Carriage 1 needs to gear in and we don't want to bring any other boards forward
+
+        IF NOT BoardEjectSensor.Active AND
+           NOT BoardPresentSensor.Active AND
+           DoublePickSensorOverride = FALSE AND
+           _IgnoreDoublePick = FALSE AND
+           _InSimulation = FALSE THEN
+            //Board left when it shouldn't have, Wrong board loaded probably
+
+            InfeedState := INF_WRONG_BOARD;
+        ELSIF _InfeedIgnoreDoublePick_Request AND _InfeedIgnoreDoublePick_Acknowledged = FALSE THEN
+            _InfeedIgnoreDoublePick_Acknowledged := TRUE;
+            DoublePick_SubState                  := DP_REQUEST_WS;
+            InfeedState                          := INF_IDLE;
+            DataConfirmationNeeded               := TRUE;
+
+        END_IF
+
+        CASE DoublePick_SubState OF
+            DP_REQUEST_WS:
+                IF WaitSync_Handler(E_WaitSync.CARRIAGE2_INFEED_DOUBLE_PICK_REQUEST) THEN
+                    IF _IgnoreDoublePick THEN
+                        DoublePick_SubState    := DP_REQUEST_WS;
+                        InfeedState            := INF_IDLE;
+                        DataConfirmationNeeded := TRUE;
+                    ELSE
+                        DoublePick_SubState := DP_SECURE;
+                    END_IF
+
+                END_IF
+
+            DP_SECURE:
+                FOR i := 1 TO 2 DO
+                    CenteringClamp[i].Extend();
+                END_FOR
+
+                IF CenteringClamp[1].Extended AND CenteringClamp[2].Extended THEN
+                    DoublePick_SubState := DP_PICK_READY_WS;
+                END_IF
+
+            DP_PICK_READY_WS:
+                IF WaitSync_Handler(E_WaitSync.CARRIAGE2_INFEED_DOUBLE_PICK_READY) THEN
+                    DoublePick_SubState := DP_RETRACT_CLAMP;
+                END_IF
+
+            DP_RETRACT_CLAMP:
+                FOR i := 1 TO 2 DO
+                    CenteringClamp[i].Retract();
+                END_FOR
+
+                IF CenteringClamp[1].Retracted AND CenteringClamp[2].Retracted THEN
+                    DoublePick_SubState := DP_PICK_DONE_WS;
+                END_IF
+
+            DP_PICK_DONE_WS:
+                IF WaitSync_Handler(E_WaitSync.CARRIAGE2_INFEED_DOUBLE_PICK_DONE) THEN
+                    DoublePick_SubState    := DP_REQUEST_WS;
+                    InfeedState            := INF_IDLE;
+                    DataConfirmationNeeded := TRUE;
+                END_IF
+        END_CASE
+
+    INF_WRONG_BOARD:
+        result := RaiseMessageBox(Header   := 'Wrong board detected',
+                                  Message1 := 'Board should be long enough to still be in the infeed and needs double picked',
+                                  Message2 := 'Select Retry to try check sensors again if board is still there',
+                                  Message3 := 'Select Override to ignore sensors for this board and attempt double pick',
+                                  Message4 := 'Select Ignore Double Pick to disable double pick for this board only',
+                                  Message5 := 'WARNING overriding sensor or disable double pick could be missing nail plates',
+                                  Message6 := 'WARNING if you override there is a potential for crashes',
+                                  Btn1     := 'Retry',
+                                  Btn3     := 'Override',
+                                  Btn5     := 'Ignore Double Pick');
+
+        IF result = 1 THEN
+            InfeedState := INF_DOUBLE_PICK;
+        ELSIF result = 3 THEN
+            InfeedState              := INF_DOUBLE_PICK;
+            DoublePickSensorOverride := TRUE;
+        ELSIF result = 5 THEN
+            InfeedState       := INF_DOUBLE_PICK;
+            _IgnoreDoublePick := TRUE;
+        END_IF
+
+        //Wrong board error message needed here, reset to restart infeed
+
+    999: //Error
+
+END_CASE;
+
+IF InfeedState <> Previous_State THEN
+    Trace(CONCAT('Infeed state change to: ', TO_STRING(InfeedState)));
+END_IF
+
+Previous_State := InfeedState;
+
+IF DoublePick_SubState <> Previous_SubState THEN
+    Trace(CONCAT('Infeed double pick state change to: ', TO_STRING(DoublePick_SubState)));
+END_IF
+
+Previous_SubState := DoublePick_SubState;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="BoardDataToPass" Id="{01164ce2-2f3f-490c-87d4-696e10747097}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY BoardDataToPass : ST_BoardData]]></Declaration>
+      <Get Name="Get" Id="{b41f4b58-c5e2-4455-aef8-5d036efccda4}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[BoardDataToPass := _BoardDataToPass;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="BoardDropped" Id="{d39004b2-438a-4e17-875d-a247e296410b}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY BoardDropped : bool]]></Declaration>
+      <Set Name="Set" Id="{28cd2548-12e0-4865-8587-6a12a146286c}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_BoardDropped := BoardDropped;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="BoardReadyForCarriage" Id="{49c9fedf-f252-43a8-b688-a51bdeb3433a}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY BoardReadyForCarriage : bool]]></Declaration>
+      <Get Name="Get" Id="{22a7c9b4-0527-4194-8927-f5b6cd14a036}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[BoardReadyForCarriage := _BoardReadyForCarriage;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Carriage1LengthTesting" Id="{bf948d0f-a2fd-458f-8f55-20e1836b9072}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Carriage1LengthTesting : bool]]></Declaration>
+      <Set Name="Set" Id="{36da56dc-be4f-4cb0-aa60-ac28c003037d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Carriage1LengthTesting := Carriage1LengthTesting;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Carriage1ResetInfeed_Request" Id="{62c1a045-3a3a-4634-858f-730f2a9b8541}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Carriage1ResetInfeed_Request : bool]]></Declaration>
+      <Set Name="Set" Id="{39dbe73d-f066-4068-bf2d-489971abbd80}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Carriage1ResetInfeed_Request := Carriage1ResetInfeed_Request;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Carriage2_DoublePickCancel_Request" Id="{9d80de30-93b3-45ea-ada2-c1d59153541e}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Carriage2_DoublePickCancel_Request : bool]]></Declaration>
+      <Set Name="Set" Id="{4960db6b-6127-4432-81a6-f49b16c6b587}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_InfeedIgnoreDoublePick_Request := Carriage2_DoublePickCancel_Request;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Carriage2ResetInfeed_Request" Id="{a67efa2e-8d0f-4eb0-b8cb-6040f1f396b5}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Carriage2ResetInfeed_Request : bool]]></Declaration>
+      <Set Name="Set" Id="{8e3a030b-92f2-4b6d-856d-e17ead655ec6}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Carriage2ResetInfeed_Request := Carriage2ResetInfeed_Request;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="CarriageClearOfBoardPresentSensor" Id="{84befdd5-2ffe-4a25-b008-044bc010ceb3}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY CarriageClearOfBoardPresentSensor : bool]]></Declaration>
+      <Set Name="Set" Id="{48a9b07c-42bc-4030-b436-709bd2c61ab4}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_CarriageClearOfBoardPresentSensor := CarriageClearOfBoardPresentSensor;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="ClearInfeed" Id="{51063f14-7985-4874-a236-60032da62315}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ClearInfeed : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ClearInfeed := FALSE;
+Gate.Retract();
+InfeedMotor.Stop();
+
+FOR i := 1 TO 2 DO
+    CenteringClamp[i].Retract();
+END_FOR
+
+IF Gate.Retracted AND CenteringClamp[1].Retracted AND CenteringClamp[2].Retracted THEN
+    ClearInfeed := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CreateEvents" Id="{e33bf11e-000d-4f2b-aeac-cf8e5922796e}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_CreateAllEventsInClass(Alarms     := InfeedAlarms,
+                         ClassSize  := SIZEOF(TC_EVENTS.Infeed),
+                         pInitEvent := ADR(TC_EVENTS.Infeed.InitReferenceEvent),
+                         Prefix     := _Name);
+
+SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{695be620-524e-47fb-bc96-04ea35a5e9f7}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR
+
+VAR
+    testSensors : BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+//HMI control for EM
+SUPER^.CyclicLogic();
+
+fbControlSourceHMI.CyclicLogic();
+
+//Set the current alarm severity for this module
+
+// _CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms:=PullWheelAlarms, CurrentSeverity:=_CurrentAlarmSeverity);
+
+//Simulate Alarm Messaging
+
+BoardEjectSensor.DebounceMode := _Debounce_Mode;
+BoardEjectSensor.DebounceTime := _Debounce_Time;
+
+BoardPresentSensor.DebounceMode := _Debounce_Mode;
+
+IF THIS^.Name = 'Infeed_1' THEN
+    BoardPresentSensor.DebounceTime := _Debounce_Time;
+
+ELSIF THIS^.Name = 'Infeed_2' THEN
+    BoardPresentSensor.DebounceTime := _Debounce_Time_Short;
+
+END_IF
+
+BoardPresentSensor.SimulationMode := E_SensorSimulationMode.InputDriven;
+BoardEjectSensor.SimulationMode   := E_SensorSimulationMode.InputDriven;
+
+IF InfeedState = INF_CONVEY AND _Sim_InfeedClear THEN
+    BoardPresentSensor.SimulationInput := TRUE;
+ELSIF InfeedState = INF_BOARD_PICKED_WS THEN
+    BoardPresentSensor.SimulationInput := FALSE;
+END_IF
+
+IF _Carriage1LengthTesting THEN
+    Gate.Retract();
+
+    FOR i := 1 TO 2 DO
+        CenteringClamp[i].Retract();
+    END_FOR
+END_IF
+
+InfeedMotor.ReferenceVel := 2500;
+
+Monitoring();
+// CyclicLogicSimulation();
+
+
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Execute" Id="{1d342d10-0033-45a2-93c9-682fd5d0b219}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Execute
+VAR_INPUT
+END_VAR
+
+VAR
+    WhiteLight : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Function based on mode.  NO need to make SUPER^.Executing() since it does nothing.
+CASE _CurrentMode OF
+    E_PMLUnitMode.ePMLUnitMode_Production:
+        // Execute Logic
+        IF THIS^.Name = 'Infeed_1' THEN
+            Auto();
+        ELSIF THIS^.Name = 'Infeed_2' THEN
+            SuperSimpAuto();
+        END_IF
+
+    E_PMLUnitMode.ePMLUnitMode_Maintenance:
+        ;
+
+    E_PMLUnitMode.ePMLUnitMode_Manual:
+        ;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteStep" Id="{1f9732df-de07-4b4a-8f9e-c853f3d5a8e1}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD ExecuteStep : BOOL
+VAR_INPUT
+    Step : ST_CSV_Step;
+END_VAR
+
+VAR
+    EmptyBoardData : ST_BoardData;
+    tempDPLength   : LREAL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExecuteStep := FALSE;
+
+CASE Step.seqName OF
+    E_CommandName.Board:
+
+        _BoardDataToPass.BoardID                 := Step.Details[1].Datas[1];
+        _BoardDataToPass.BoardHeight             := STRING_TO_REAL(Step.Details[1].Datas[2]);
+        _BoardDataToPass.BoardWidth              := STRING_TO_REAL(Step.Details[1].Datas[3]);
+        _BoardDataToPass.BoardLength             := STRING_TO_REAL(Step.Details[1].Datas[4]);
+        _BoardDataToPass.BoardNumber             := STRING_TO_INT(Step.Details[1].Datas[5]);
+        _BoardDataToPass.LeadingEdgeBevelOffset  := STRING_TO_REAL(Step.Details[1].Datas[6]);
+        _BoardDataToPass.TrailingEdgeBevelOffset := STRING_TO_REAL(Step.Details[1].Datas[7]);
+
+        _BoardDataToPass.PickOffset :=
+            MIN((_BoardDataToPass.LeadingEdgeBevelOffset +
+                 ((_BoardDataToPass.BoardLength - _BoardDataToPass.LeadingEdgeBevelOffset - _BoardDataToPass.TrailingEdgeBevelOffset) / 2) -
+                 (PICK_DEVICE_WIDTH / 2)),
+                _BoardDataToPass.LeadingEdgeBevelOffset + DEFAULT_PICK_OFFSET);
+
+        _BoardDataToPass.PickOffset := MIN(_BoardDataToPass.PickOffset, Global.BEPoint_Backup.Infeed - (Global.BEPoint_Backup.MinCarriagePos + 25));
+
+        //TODO: calculate with leading/trailing offset eventually
+
+        _BoardDataToPass.Positions[E_BoardData_Positions.CARRIAGE_1INFEED_HANDOFF].Position := Global.BEPoint_Backup.Infeed;
+        _BoardDataToPass.Positions[E_BoardData_Positions.CARRIAGE_12_HANDOFF].Position      := BEPoint_Backup.PrePress + 100;
+
+        _BoardDataToPass.DoublePickNeeded := _BoardDataToPass.BoardLength > Global.DOUBLEPICK_MIN_LENGTH;
+
+        _BoardDataToPass.Positions[E_BoardData_Positions.GEAR_IN_SYNC].Position := (BEPoint_Backup.Infeed - 200) + _BoardDataToPass.BoardLength;
+
+        IF _BoardDataToPass.BoardLength < 120 * 25.4 THEN
+            _BoardDataToPass.Positions[E_BoardData_Positions.CARRIAGE_23_HANDOFF].Position := BEPoint_Backup.AssemblyHandoff + 100;
+        ELSE
+            _BoardDataToPass.Positions[E_BoardData_Positions.CARRIAGE_23_HANDOFF].Position := (BEPoint_Backup.PickPoint_1 - 630) + 100;
+        END_IF
+
+        _BoardDataToPass.Positions[E_BoardData_Positions.BOARD_DROP].Position := BEPoint_Backup.PickPoint_1 + (_BoardDataToPass.BoardLength / 2);
+
+        DataReady := TRUE;
+
+        IF _StepComplete THEN
+            ExecuteStep        := TRUE;
+            DataReady          := FALSE;
+            _StepComplete      := FALSE;
+            _CarriageTookBoard := FALSE;
+        END_IF
+
+ELSE
+    DataReady        := FALSE;
+    ExecuteStep      := TRUE;
+    _BoardDataToPass := EmptyBoardData;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{50701249-5cf4-444f-991e-37cd198a4794}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF HMI_INPUT[1] THEN
+    Gate.Extend();
+END_IF
+
+IF HMI_INPUT[2] THEN
+    Gate.Retract();
+END_IF
+
+IF HMI_INPUT[3] THEN
+    FOR i := 1 TO 2 DO
+        CenteringClamp[i].Extend();
+    END_FOR
+END_IF
+
+IF HMI_INPUT[4] THEN
+    FOR i := 1 TO 2 DO
+        CenteringClamp[i].Retract();
+    END_FOR
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Holding" Id="{0ece05e2-aa8f-4bf5-bbbf-8b4ab90829e8}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Holding</b> state*)
+METHOD PROTECTED Holding]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[InfeedMotor.Stop();
+
+SUPER^.Holding();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="IgnoreDoublePick" Id="{3b2fb1f1-5e44-4576-b823-8811020b51a9}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY IgnoreDoublePick : BOOL]]></Declaration>
+      <Get Name="Get" Id="{58d5fa2f-741e-49c9-8a97-977e93a47496}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IgnoreDoublePick := _IgnoreDoublePick;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="InfeedToInfeedReady" Id="{52ad68e4-7340-4e3a-b782-c004d2d956ca}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY InfeedToInfeedReady : Bool]]></Declaration>
+      <Get Name="Get" Id="{5c87d48f-34e4-4cc4-aa82-c13d0e2bf434}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[InfeedToInfeedReady := _InfeedToInfeedReady;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{91b78697-a62d-4f21-b2a5-7d5a2acce520}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_InfeedToInfeedReady := InfeedToInfeedReady;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="InfeedToInfeedRequest" Id="{67194cda-4360-432f-bfe3-d83a5f8b7d80}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY InfeedToInfeedRequest : Bool]]></Declaration>
+      <Get Name="Get" Id="{8360e096-bde9-4f7b-80a8-2bce616e54c6}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[InfeedToInfeedRequest := _InfeedToInfeedRequest;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{68d75c72-15df-4e65-8576-b7b2cc9a5f80}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_InfeedToInfeedRequest := InfeedToInfeedRequest;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Initialize" Id="{8a530c83-81cd-469f-b38f-a26fc2c04e75}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(InfeedMotor);
+        RegisterComponent(Gate);
+        RegisterComponent(BoardPresentSensor);
+        RegisterComponent(BoardEjectSensor);
+
+        RegisterComponent(LengthCheckSensorMed);
+        RegisterComponent(LengthCheckSensorLong);
+
+        FOR i := 1 TO 2 DO
+            RegisterComponent(CenteringClamp[i]);
+        END_FOR
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="LineNumber" Id="{aa045a9f-14c8-4168-9b7e-2043384f042a}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY LineNumber : INT]]></Declaration>
+      <Set Name="Set" Id="{cbc36379-7a54-49f7-9c14-d9017dff4507}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_LineNumber := LineNumber;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Monitoring" Id="{18062eef-70be-4836-8228-944e521c3087}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[///////////////////////////////////////////////////////////////////////////////
+// 5. Timeout: ID=5
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT InfeedAlarms[E_Infeed.InfeedTimeout].bRaised) AND InfeedTimeoutAlarm THEN
+    // Raise alarm if Infeed is taking a long time to get a board
+    InfeedAlarms[E_Infeed.InfeedTimeout].Raise(0);
+ELSIF InfeedAlarms[E_Infeed.InfeedTimeout].bRaised AND (NOT InfeedTimeoutAlarm) THEN
+    // Clear when a board is found
+    InfeedAlarms[E_Infeed.InfeedTimeout].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 6. Timeout: ID=6
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT InfeedAlarms[E_Infeed.InfeedNotResetting].bRaised) AND InfeedNotResettingAlarm THEN
+    // Raise alarm if Infeed is taking too long to reset and start conveying
+    InfeedAlarms[E_Infeed.InfeedNotResetting].Raise(0);
+ELSIF InfeedAlarms[E_Infeed.InfeedNotResetting].bRaised AND (NOT InfeedNotResettingAlarm) THEN
+    // Clear when infeed can convey forward
+    InfeedAlarms[E_Infeed.InfeedNotResetting].Clear(0, 0);
+END_IF;
+
+//////////////////////////////////////////////////////////////////////////
+// Wrap-up: Evaluate overall severity, then run the extended Monitoring
+//////////////////////////////////////////////////////////////////////////
+_CurrentAlarmSeverity := TcEventSeverity.Verbose;
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := InfeedAlarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+// Finally, run the extended monitoring
+// SUPER^.Monitoring();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MoveClearActive" Id="{ad9dda84-5c12-4ecd-bda3-7f146049045e}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MoveClearActive : BOOL]]></Declaration>
+      <Set Name="Set" Id="{98e72854-6e9f-4cc0-adbf-26a266fe7368}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MoveClearActive := MoveClearActive;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="ParentState" Id="{018af083-dac5-441c-8ad1-d3eb080fa405}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ParentState : E_PMLState]]></Declaration>
+      <Set Name="Set" Id="{2a50249b-d0c1-4f51-afa6-bfcc21e29580}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_CurrentParentState := ParentState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="ParseBoardData" Id="{827cf0c8-9a25-40cf-a7cc-f1ceff7b6898}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ParseBoardData : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ReadyForBoard" Id="{3d3d7700-9188-4a96-8f30-6507bef3d281}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ReadyForBoard : BOOL]]></Declaration>
+      <Get Name="Get" Id="{2ad21028-d7e2-402a-a648-f9274a87c69e}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ReadyForBoard := _ReadyForBoard;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="RoughLengthCheck" Id="{1c5f6a39-19b5-43af-bf79-8cb853c54f68}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD RoughLengthCheck : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[RoughLengthCheck := FALSE;
+
+IF _BoardDataToPass.BoardLength > BOARD_LENGTH_SENSOR2_LOCATION THEN
+    IF LengthCheckSensorLong.Active AND LengthCheckSensorMed.Active THEN
+        RoughLengthCheck := TRUE;
+    ELSE
+        RoughLengthCheck := FALSE;
+    END_IF
+ELSIF _BoardDataToPass.BoardLength > BOARD_LENGTH_SENSOR1_LOCATION THEN
+    IF NOT LengthCheckSensorLong.Active AND LengthCheckSensorMed.Active THEN
+        RoughLengthCheck := TRUE;
+    ELSE
+        RoughLengthCheck := FALSE;
+    END_IF
+ELSE
+    IF NOT LengthCheckSensorLong.Active AND NOT LengthCheckSensorMed.Active THEN
+        RoughLengthCheck := TRUE;
+    ELSE
+        RoughLengthCheck := FALSE;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Sim_InfeedClear" Id="{c718c373-477a-47a8-ae13-d4e0abd63dbc}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Sim_InfeedClear : bool]]></Declaration>
+      <Set Name="Set" Id="{a4294a62-c464-4bac-89aa-edf140835a29}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Sim_InfeedClear := Sim_InfeedClear;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="SimpAuto" Id="{c70dd7d0-506f-49d7-91a9-d7fa0f10064f}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD SimpAuto : BOOL
+VAR_INPUT
+END_VAR
+
+VAR
+    result : USINT;
+END_VAR
+
+VAR_INST
+    Previous_State           : E_Infeed_States;
+    DoublePickSensorOverride : BOOL;
+    InfeedToInfeedTrig       : R_TRIG;
+    InfeedToInfeedConfirmed  : BOOL;
+    AlarmTON                 : TON;
+
+    BoardPresentTimeOff_TON : TON;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// State Machine Logic
+
+CASE InfeedState_Simp OF
+    INF_IDLE: //IDLE
+        AlarmTON(IN := TRUE, PT := T#5S);
+        BoardPresentTimeOff_TON(IN := NOT BoardPresentSensor.Active, PT := T#5S);
+        _InfeedToInfeedReady := FALSE;
+        BoardRequested       := FALSE;
+
+        IF BoardPresentTimeOff_TON.Q THEN
+            InfeedState_Simp := INF_CONVEY;
+            _ReadyForBoard   := TRUE;
+            AlarmTON(IN := FALSE);
+        END_IF
+
+        InfeedNotResettingAlarm := AlarmTON.Q;
+
+    INF_CONVEY: //Convey
+
+        IF BoardRequested = FALSE THEN
+            IF WaitSync_Handler(E_WaitSync.INFEED2_MBI_DROP_BOARD) THEN
+                BoardRequested := TRUE;
+            END_IF
+        ELSE
+            BoardPresentTimeOff_TON(IN := FALSE, PT := T#5S);
+            AlarmTON(IN := TRUE, PT := T#10S);
+
+            _ReadyForBoard := TRUE;
+
+            Gate.Extend();
+
+            IF Gate.Extended THEN
+                InfeedMotor.Jog(JogFW := TRUE);
+            END_IF
+
+            IF BoardPresentSensor.Active THEN
+                InfeedState_Simp := INF_BOARD_FOUND;
+                AlarmTON(IN := FALSE);
+            END_IF
+
+            InfeedTimeoutAlarm := AlarmTON.Q;
+
+        END_IF
+
+    INF_BOARD_FOUND: //Board Found
+
+        IF InfeedMotor.Stop() THEN
+            InfeedState_Simp := INF_BOARD_CHECK;
+        END_IF
+
+    INF_BOARD_CHECK:
+        _ReadyForBoard := FALSE;
+        Gate.Retract();
+
+        IF Gate.Retracted AND BoardPresentSensor.Active THEN
+            InfeedState_Simp := INF_BOARD_READY;
+        END_IF
+
+    INF_BOARD_READY: //Board Ready
+        _ReadyForBoard := FALSE;
+        Gate.Retract();
+        _InfeedToInfeedReady := TRUE;
+
+        IF BoardReleaseRequested = FALSE THEN
+            IF THIS^.Name = 'Infeed_2' THEN
+                IF WaitSync_Handler(E_WaitSync.INFEED1_INFEED2_RELEASE_BOARD) THEN
+                    BoardReleaseRequested := TRUE;
+                END_IF
+            END_IF
+        END_IF
+
+        IF BoardReleaseRequested THEN
+
+            InfeedMotor.Jog(JogFW := TRUE);
+
+            IF BoardPresentSensor.Active = FALSE THEN
+                InfeedState_Simp      := INF_IDLE;
+                BoardReleaseRequested := FALSE;
+            END_IF
+        END_IF
+
+    999: //Error
+
+END_CASE;
+
+IF InfeedState_Simp <> Previous_State THEN
+    Trace(CONCAT('Infeed state change to: ', TO_STRING(InfeedState_Simp)));
+END_IF
+
+Previous_State := InfeedState_Simp;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Starting" Id="{d7d08c61-fea1-4ec2-81d2-8093b978e14c}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Starting</b> state*)
+METHOD PROTECTED Starting]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[DataConfirmationNeeded := TRUE;
+_StepComplete          := FALSE;
+DataReady              := FALSE;
+_CarriageTookBoard     := FALSE;
+_ReadyForBoard         := FALSE;
+InfeedState            := INF_IDLE;
+
+SUPER^.Starting();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stopping" Id="{bf8987f2-c07a-4645-a677-d3e52a0ce81d}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Holding</b> state*)
+METHOD PROTECTED Stopping]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[InfeedMotor.Stop();
+
+SUPER^.Stopping();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SuperSimpAuto" Id="{495b7811-9727-4fde-a1b0-26acc9c0fa7f}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD SuperSimpAuto : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// State Machine Logic
+
+CASE InfeedState_Simp OF
+    INF_IDLE: //IDLE
+		InfeedMotor.Stop();
+        IF _ActiveInfeedMoving THEN
+            InfeedState_Simp := INF_CONVEY;
+        END_IF
+		
+    INF_CONVEY: //Convey
+
+        Gate.Retract();
+
+        IF Gate.Retracted then
+            InfeedMotor.Jog(JogFW := TRUE);
+        END_IF
+		
+		IF NOT _ActiveInfeedMoving THEN
+            InfeedState_Simp := INF_IDLE;
+		END_IF
+END_CASE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspending" Id="{463846a1-31f2-4685-91c9-91bd89162d2f}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Holding</b> state*)
+METHOD PROTECTED Suspending]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[InfeedMotor.Stop();
+
+SUPER^.Suspending();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="TestExecute" Id="{240f433d-6a3a-4e62-a62a-3267e33dca08}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY TestExecute : bool]]></Declaration>
+      <Set Name="Set" Id="{d21771f3-1c29-4f57-99ed-efa32cfdded4}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_TestExecute := TestExecute;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,554 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Robot_Outfeed" Id="{46ec0cb6-7c6c-4138-9060-5a35e607bf5a}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Robot_Outfeed EXTENDS FB_Robot
+VAR
+    // Sub module definitions here
+
+    _PickPlaceDataToPass : ST_PickPlace;
+END_VAR
+
+VAR
+
+    PickPlaceData : ST_PickPlace;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{f4d46a54-3178-412c-b454-19a187c31107}" />
+    <Folder Name="Methods" Id="{e1973cef-260d-4119-92e7-0ef8bfe835c0}">
+      <Folder Name="CommandSteps" Id="{4fbaee45-ef34-4d33-b29a-10f2d8f75ce9}" />
+    </Folder>
+    <Folder Name="Properties" Id="{f5b7f16a-8de5-474e-a210-9b57fc0d0be7}" />
+    <Method Name="CyclicLogic" Id="{4598719d-26fb-4f09-a013-ec178d6921e4}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR
+
+VAR
+
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+SUPER^.CyclicLogic();
+
+UI_MessageBox();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogicSimulation" Id="{a8cacfd5-0dfc-458f-9e48-65075e870fff}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogicSimulation : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteDetail" Id="{9ab743bb-07a7-459d-a48c-ca184a379154}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD ExecuteDetail : BOOL
+VAR_INPUT
+    StepToRun : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExecuteDetail := FALSE;
+
+CASE Handshake_Step OF
+    0:
+        Robot.Handshake.OUT.Execute_Step    := TRUE;
+        Robot.Handshake.OUT.Execute_StepNum := UDINT_TO_UINT(StepToRun);
+
+        IF Robot.Handshake.IN.Executing_Step = TRUE THEN
+            Handshake_Step := 1;
+        END_IF
+
+    1:
+        IF Robot.Handshake.IN.Executing_Step = FALSE AND Robot.Handshake.IN.StepComplete = TRUE THEN
+            Handshake_Step := 2;
+        END_IF
+
+    2:
+        Robot.Handshake.OUT.Execute_Step    := FALSE;
+        Robot.Handshake.OUT.Execute_StepNum := 0;
+
+        IF Robot.Handshake.IN.StepComplete = FALSE THEN
+            ExecuteDetail  := TRUE;
+            Handshake_Step := 0;
+        END_IF
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteDetail_SIM" Id="{ced43bbf-2220-40d0-86e1-87f79b3ac8c5}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD PROTECTED ExecuteDetail_SIM : BOOL
+VAR_INPUT
+    StepToRun : UDINT;
+    LineNum   : INT;
+END_VAR
+
+VAR_INST
+    robotWS_State : E_AssemblyPickState;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE robotWS_State OF
+    BOARD_READY_WS:
+        IF WaitSync_Handler(E_WaitSync.PICK1_ASSEMBLY_BOARD_READY) THEN
+            robotWS_State := OPEN_GRIPPERS_WS;
+        END_IF
+
+    OPEN_GRIPPERS_WS:
+        IF WaitSync_Handler(E_WaitSync.PICK1_ASSEMBLY_OPEN_GRIPPERS) THEN
+            robotWS_State := PICKING_BOARD_WS;
+        END_IF
+
+    PICKING_BOARD_WS:
+        IF WaitSync_Handler(E_WaitSync.PICK1_ASSEMBLY_PICKING_BOARD) THEN
+            robotWS_State := BOARD_CLEAR_WS;
+        END_IF
+
+    BOARD_CLEAR_WS:
+        IF WaitSync_Handler(E_WaitSync.PICK1_ASSEMBLY_BOARD_CLEAR) THEN
+            IF LineNum = 1 THEN
+                robotWS_State := SIM_JIG2READYPLACE_WS;
+            ELSE
+                robotWS_State := SIM_JIG3READYPLACE_WS;
+            END_IF
+        END_IF
+
+    SIM_JIG2READYPLACE_WS:
+        IF WaitSync_Handler(E_WaitSync.OUTFEED_JIG2_PICKPLACE_READY) THEN
+            robotWS_State := SIM_JIG2PLACEDONE_WS;
+        END_IF
+
+    SIM_JIG2PLACEDONE_WS:
+        IF WaitSync_Handler(E_WaitSync.OUTFEED_JIG2_PICKPLACE_DONE) THEN
+            robotWS_State := PICK_DONE;
+        END_IF
+
+    SIM_JIG3READYPLACE_WS:
+        IF WaitSync_Handler(E_WaitSync.OUTFEED_JIG3_PICKPLACE_READY) THEN
+            robotWS_State := SIM_JIG3PLACEDONE_WS;
+        END_IF
+
+    SIM_JIG3PLACEDONE_WS:
+        IF WaitSync_Handler(E_WaitSync.OUTFEED_JIG3_PICKPLACE_DONE) THEN
+            robotWS_State := PICK_DONE;
+        END_IF
+
+    PICK_DONE:
+        ExecuteDetail_SIM := true;
+        robotWS_State     := BOARD_READY_WS;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteStep" Id="{c4d678d7-e7a2-4fe9-a706-8b7ab67b2656}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD ExecuteStep : BOOL
+VAR_INPUT
+    Step       : ST_CSV_Step;
+    LineNumber : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExecuteStep := FALSE;
+
+CASE Step.seqName OF
+    E_CommandName.PickPlace:
+
+        PickPlaceParse(Step, PickPlaceData);
+        _PickPlaceDataToPass := PickPlaceData;
+        // clear out array first
+        Robot.Clear_DataToSend();
+
+        // first entry is always step type
+        Robot.RecipeData_ToSend[0] := E_CommandName.PickPlace;
+
+        Robot.RecipeData_ToSend[1] := INT_TO_DINT(PickPlaceData.Number);
+
+        Robot.RecipeData_ToSend[2] := REAL_TO_DINT(PickPlaceData.Length);
+
+        Robot.RecipeData_ToSend[3] := REAL_TO_DINT(PickPlaceData.Width);
+
+        Robot.RecipeData_ToSend[4] := REAL_TO_DINT(PickPlaceData.XPos);
+
+        Robot.RecipeData_ToSend[5] := REAL_TO_DINT(PickPlaceData.YPos);
+
+        Robot.RecipeData_ToSend[6] := REAL_TO_DINT(PickPlaceData.ZPos);
+
+        Robot.RecipeData_ToSend[7] := REAL_TO_DINT(PickPlaceData.ZRot);
+
+        Robot.RecipeData_ToSend[8] := INT_TO_DINT(PickPlaceData.ConvIndex);
+
+        Robot.RecipeData_ToSend[9] := INT_TO_DINT(LineNumber);
+
+        IF _InSimulation THEN
+            IF ExecuteDetail_SIM(Step.seqID, LineNumber) THEN
+                ExecuteStep := TRUE;
+            END_IF
+        ELSE
+            IF ExecuteDetail(Step.seqID) THEN
+                ExecuteStep := TRUE;
+            END_IF
+        END_IF
+
+ELSE
+    ExecuteStep := TRUE;
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{e8c36c36-a71c-48e1-9e1f-1b9494b01aa9}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{3aaeb475-c9f5-4e31-846a-f6a522d339f2}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(Robot);
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="PickPlaceDataToPass" Id="{3d943358-8a3d-4c32-9e34-2783410d4a85}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PickPlaceDataToPass : ST_PickPlace]]></Declaration>
+      <Get Name="Get" Id="{4f88e056-44f6-4204-a625-d5db3e156809}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[PickPlaceDataToPass := _PickPlaceDataToPass;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="UI_MessageBox" Id="{46c22070-1f18-4798-b04d-2aaf55ab7f97}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD UI_MessageBox : BOOL
+VAR_INPUT
+END_VAR
+
+VAR
+    result : USINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Robot.Handshake.IN.ErrorPresent THEN
+    CASE Robot.Handshake.IN.MessageNumber OF
+
+        //////////////////////////// ASSEMBLY PLC ERRORS ////////////////////////////
+        0:
+
+            // Idle State Should not have an error of 0
+
+            ////////// 1-29 PROCESS ERRORS /////////
+
+            // Note: The code for messages 1 and 2 is commented out, so we skip them.
+
+        3:
+            // PrePlate ERROR_PROCESSING_DATA
+            result := RaiseMessageBox(Header   := 'Processing Data Error ASSEMBLY',
+                                      Message1 := 'PLC Received same file twice from SAM',
+                                      Message2 := 'Choose RETRY to retry data processing',
+                                      Message3 := 'Choose CONTINUE to proceed anyways',
+                                      Btn3     := 'RETRY',
+                                      Btn5     := 'CONTINUE',
+                                      Severity := TcEventSeverity.Error);
+
+        15:
+            // Press Error Detected
+            result := RaiseMessageBox(Header   := 'Press Error Detected',
+                                      Message1 := 'Select CLEAR to clear error and send press back to idle',
+                                      Btn3     := 'CLEAR',
+                                      Severity := TcEventSeverity.Error);
+
+        16:
+            // Waiting on Press
+            result := RaiseMessageBox(Header   := 'Waiting on Press',
+                                      Message1 := 'Waiting for press to be fully retracted and in IDLE state',
+                                      Message3 := 'Select RESET to cycle/retract press',
+                                      Btn3     := 'RESET',
+                                      Severity := TcEventSeverity.Error);
+
+        19:
+            // test alarm
+            result := RaiseMessageBox(Header   := 'test alarm',
+                                      Message1 := 'Message1',
+                                      Message2 := 'Message2',
+                                      Message3 := 'Message3',
+                                      Message4 := 'Message4',
+                                      Message5 := 'Message5',
+                                      Btn1     := 'button 1',
+                                      Btn2     := 'button 2',
+                                      Btn3     := 'button 3',
+                                      Btn4     := 'button 4',
+                                      Btn5     := 'button 5',
+                                      Severity := TcEventSeverity.Error);
+
+        26:
+            // System Suspended
+            result := RaiseMessageBox(Header   := 'System Suspended',
+                                      Message1 := 'Press OK to clear message',
+                                      Message3 := 'Clear any active errors on carriages or robots and press Resume to continue',
+                                      Btn3     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+            ////////// 30-59 ROBOT ERRORS /////////
+        30:
+            // Outfeed Robot Stopped
+            result := RaiseMessageBox(Header   := 'Outfeed Robot Stopped',
+                                      Message1 := 'Outfeed robot crashed/stopped',
+                                      Message2 := 'Check assembly robot area to make sure nothing is obstructing the robot',
+                                      Message3 := 'Select OK to dismiss error message',
+                                      Btn3     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        31:
+            // Outfeed Robot Error
+            result := RaiseMessageBox(Header   := 'Outfeed Robot Error',
+                                      Message1 := 'Check robots teach pendant to see what the issue is.',
+                                      Message2 := 'Select CONTINUE when the robot is ready to retry.',
+                                      Btn5     := 'CONTINUE',
+                                      Severity := TcEventSeverity.Error);
+
+        35:
+            // Light Curtain Tripped
+            result := RaiseMessageBox(Header   := 'Light Curtain Tripped',
+                                      Message1 := 'Outfeed light curtains detected movement',
+                                      Message2 := 'Make sure outfeed area is clear before resuming',
+                                      Message3 := 'Select OK to dismiss error message',
+                                      Btn3     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        38:
+            // EOAT Failed to Pick Board
+            result := RaiseMessageBox(Header   := 'EOAT Failed to Pick Board',
+                                      Message1 := 'Choose RETRY to repick board',
+                                      Message3 := 'Choose OVERRIDE to continue with pick',
+                                      Btn3     := 'RETRY',
+                                      Btn4     := 'OVERRIDE',
+                                      Severity := TcEventSeverity.Error);
+
+        48:
+            // Check board height
+            result := RaiseMessageBox(Header   := 'Check board height',
+                                      Message1 := '',
+                                      Message2 := 'Pick motor not at correct height',
+                                      Message3 := 'Check to make sure correct board was loaded and teeth are embedded in the wood',
+                                      Message5 := 'If correct board is loaded then press OVERRIDE to continue',
+                                      Btn1     := 'OVERRIDE',
+                                      Severity := TcEventSeverity.Error);
+
+        51:
+            // confirm material has been cleared
+            result := RaiseMessageBox(Header   := 'Remove Material from Assembly Conveyors',
+                                      Message1 := 'Remove any boards from the Assembly area',
+                                      Message2 := 'Select OK when system is ready to continue',
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        53:
+            // Skip Press?
+            result := RaiseMessageBox(Header   := 'Skip Press?',
+                                      Message1 := 'SKIP wills skip all press motion and use a 2.5s timer to simulate press',
+                                      Message3 := 'PRESS will press like normal',
+                                      Btn3     := 'SKIP',
+                                      Btn5     := 'PRESS',
+                                      Severity := TcEventSeverity.Error);
+
+        54:
+            // Velocity
+            result := RaiseMessageBox(Header   := 'Velocity',
+                                      Message1 := 'This is the speed the carriages will run',
+                                      Btn2     := '2000',
+                                      Btn3     := '3000',
+                                      Btn4     := '4000',
+                                      Severity := TcEventSeverity.Error);
+
+        55:
+            // Are You Sure?
+            result := RaiseMessageBox(Header   := 'Are You Sure?',
+                                      Message1 := '4000 is pretty quick speed racer',
+                                      Btn2     := 'YES',
+                                      Btn3     := 'NO',
+                                      Btn4     := 'MAYBE',
+                                      Severity := TcEventSeverity.Error);
+
+        56:
+            // No System Config File Loaded
+            result := RaiseMessageBox(Header   := 'No System Config File Loaded',
+                                      Message1 := 'Load in sys config file and retry',
+                                      Btn5     := 'RETRY',
+                                      Severity := TcEventSeverity.Error);
+
+        70:
+            // Assembly Abort Requested
+            result := RaiseMessageBox(Header   := 'Assembly Abort Requested',
+                                      Message1 := CONCAT('How do you want to abort truss ', ''),
+                                      Message2 := 'Abort will scrap the truss',
+                                      Message3 := 'Manual will stop running the truss but allow you to manually build it.',
+                                      Message4 := 'Retry will stop running the truss and requeue it in SAM',
+                                      Btn2     := 'ABORT',
+                                      Btn3     := 'MANUAL',
+                                      Btn4     := 'RETRY',
+                                      Severity := TcEventSeverity.Error);
+
+        71:
+            // Eject 1 Abort Requested
+            result := RaiseMessageBox(Header   := 'Eject 1 Abort Requested',
+                                      Message1 := CONCAT('How do you want to abort truss ', ''),
+                                      Message2 := 'Abort will scrap the truss',
+                                      Message3 := 'Manual will stop running the truss but allow you to manually build it.',
+                                      Message4 := 'Retry will stop running the truss and requeue it in SAM',
+                                      Message5 := 'Select CANCEL to continue build',
+                                      Btn2     := 'ABORT',
+                                      Btn3     := 'MANUAL',
+                                      Btn4     := 'RETRY',
+                                      Btn5     := 'CANCEL',
+                                      Severity := TcEventSeverity.Error);
+
+        72:
+            // Eject 2 Abort Requested
+            result := RaiseMessageBox(Header   := 'Eject 2 Abort Requested',
+                                      Message1 := CONCAT('How do you want to abort truss ', ''),
+                                      Message2 := 'Abort will scrap the truss',
+                                      Message3 := 'Manual will stop running the truss but allow you to manually build it.',
+                                      Message4 := 'Retry will stop running the truss and requeue it in SAM',
+                                      Btn2     := 'ABORT',
+                                      Btn3     := 'MANUAL',
+                                      Btn4     := 'RETRY',
+                                      Severity := TcEventSeverity.Error);
+
+        73:
+            // Assembly AirPressure
+            result := RaiseMessageBox(Header   := 'Low Air Pressure At Outfeed',
+                                      Message1 := 'Pressure near Assembly is low',
+                                      Message3 := 'Check dump valve and sensor',
+                                      Message5 := 'Press OK to test again',
+                                      Btn1     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        90:
+            // Board Not detected
+            result := RaiseMessageBox(Header   := 'No Board Detected.',
+                                      Message1 := 'Choose RETRY to repick board',
+                                      Message3 := 'Choose OVERRIDE to continue with pick',
+                                      Btn3     := 'RETRY',
+                                      Btn4     := 'Override',
+                                      Severity := TcEventSeverity.Error);
+        92:
+            // Board Not detected
+            result := RaiseMessageBox(Header   := 'Check Board.',
+                                      Message1 := 'Choose Continue to retry picking board',
+                                      Btn3     := 'CONTINUE',
+                                      Severity := TcEventSeverity.Error);
+
+        93:
+            // Board Not detected
+            result := RaiseMessageBox(Header   := 'Board Not Detected When Placing',
+                                      Message1 := 'Verify board is being held',
+                                      Message2 := 'If there is no board make sure board is placed fully on conveyor',
+                                      Message3 := 'If there is no board, check if robot track is clear',
+                                      Message4 := 'Press OK to continue',
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+    ELSE
+        // Not Valid Message Number
+
+        // The original code appends the ErrorNumber integer to the message.
+
+        // We'll keep the same logic, but we can store it as a separate or inline string.
+
+        // For demonstration, we directly pass in the integer, though we normally would do
+
+        // a conversion. We'll just label it as an unknown message.
+        result := RaiseMessageBox(Header   := 'Not Valid Message Number',
+                                  Message1 := CONCAT('UIMessageBox was sent message number: ', UINT_TO_STRING(Robot.Handshake.IN.MessageNumber)),
+                                  Message3 := 'Contact Support to update message number.',
+                                  Btn1     := 'EXIT MSG',
+                                  Severity := TcEventSeverity.Error);
+    END_CASE;
+
+    IF result <> 0 THEN
+        Robot.Handshake.OUT.MessageSolution    := result;
+        Robot.Handshake.OUT.MessageAcknowledge := TRUE;
+    END_IF
+ELSE
+    Robot.Handshake.OUT.MessageSolution    := 0;
+    Robot.Handshake.OUT.MessageAcknowledge := FALSE;
+END_IF;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

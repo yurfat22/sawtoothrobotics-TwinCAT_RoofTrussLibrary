@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Plates" Id="{a451e7f0-0d9e-4ebe-bade-ea75297c993a}">
+    <Declaration><![CDATA[TYPE
+    ST_Plates : STRUCT
+        Plates : ARRAY[1..MAX_NUMBER_OF_PLATES] OF ST_PlateInfo;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

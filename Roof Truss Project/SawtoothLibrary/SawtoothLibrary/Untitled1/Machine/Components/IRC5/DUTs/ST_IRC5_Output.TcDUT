@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_IRC5_Output" Id="{c2325c88-dcc2-4ca5-8117-2897a7c19f52}">
+    <Declaration><![CDATA[TYPE
+    ST_IRC5_Output : STRUCT
+        Pause      : BOOL;
+        Resume     : BOOL;
+        EStopReset : BOOL;
+        MotorsOn   : BOOL;
+        MotorsOff  : BOOL;
+        PPtoMain   : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

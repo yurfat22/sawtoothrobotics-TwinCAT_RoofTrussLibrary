@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_SpeedOptions" Id="{2af78fa8-7904-4a3b-9fbb-3271db6bca95}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_SpeedOptions : (
+        AUTO        := 1,
+        MANUAL      := 2,
+        MAINTENANCE := 3,
+        TESTING1    := 4,
+        TESTING2    := 5,
+        TESTING3    := 6,
+        TESTING4    := 7,
+        TESTING5    := 8
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

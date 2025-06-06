@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_DoubleSolenoidRetractFeedback" Id="{6e7e9b75-2b82-4ad8-8794-0834687fa0e7}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DoubleSolenoidRetractFeedback EXTENDS FB_DoubleSolenoid
+VAR
+    RetractedSensor AT %I* : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{670bd6bb-704c-4bc1-8f64-c72ba58dc398}" />
+    <Folder Name="Methods" Id="{e2f0fd37-f06d-4558-83b4-f1317c56e06f}" />
+    <Folder Name="Properties" Id="{de23d5ce-48f7-4a97-bae6-180ea05e60b8}" />
+    <Method Name="Feedback" Id="{04ce770f-8990-4819-863e-35d903fcc31d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Feedback]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _Simulate THEN
+    _Extended  := NOT RetractedSensor;
+    _Retracted := RetractedSensor;
+    Extend_TON(IN := _Extending, PT := LREAL_TO_TIME(_ExtendTime));
+    Retract_TON(IN := _Retracting, PT := LREAL_TO_TIME(_RetractTime));
+
+    IF Extend_TON.Q AND RetractedSensor THEN
+        IF NOT SolenoidAlarms[E_CylinderAlarms.ExtendTimeout].bRaised THEN
+            SolenoidAlarms[E_CylinderAlarms.ExtendTimeout].Raise(0);
+            _ExtendRequest := FALSE;
+            _Extending     := FALSE;
+        END_IF
+    ELSIF _Extending AND NOT RetractedSensor THEN
+        _Extended  := TRUE;
+        _Extending := FALSE;
+    END_IF
+
+    IF Retract_TON.Q AND NOT RetractedSensor THEN
+        IF NOT SolenoidAlarms[E_CylinderAlarms.RetractTimeout].bRaised THEN
+            SolenoidAlarms[E_CylinderAlarms.RetractTimeout].Raise(0);
+            _RetractRequest := FALSE;
+            _Retracting     := FALSE;
+        END_IF
+    ELSIF _Retracting AND RetractedSensor THEN
+        _Retracted  := TRUE;
+        _Retracting := FALSE;
+    END_IF
+ELSE
+    SUPER^.Feedback();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HardwareInit" Id="{cd80f328-b104-45ae-ac80-dc6dc4f713d7}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED HardwareInit]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT RetractedSensor THEN
+    _Extended  := TRUE;
+    _Retracted := FALSE;
+ELSIF RetractedSensor THEN
+    _Extended  := FALSE;
+    _Retracted := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="RetractedInput" Id="{9f106143-9755-406f-837c-9240b41f47fd}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY RetractedInput : BOOL]]></Declaration>
+      <Set Name="Set" Id="{f809b0ab-8aa3-4bca-b5bc-133fdfc8b5db}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[RetractedSensor := RetractedInput;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

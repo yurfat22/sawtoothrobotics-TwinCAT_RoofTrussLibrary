@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_VFD" Id="{d5046df4-1d79-44a2-92aa-463fd5a4ba92}">
+    <Declaration><![CDATA[INTERFACE I_VFD]]></Declaration>
+    <Method Name="Jog" Id="{a9ea47fc-b360-443e-8b19-e74f56e72cfd}">
+      <Declaration><![CDATA[METHOD Jog : BOOL
+VAR_INPUT
+    JogFW : BOOL := FALSE;
+    JogBW : BOOL := FALSE;
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="Stop" Id="{092b1b8a-9c2e-4743-89cc-51249266c685}">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

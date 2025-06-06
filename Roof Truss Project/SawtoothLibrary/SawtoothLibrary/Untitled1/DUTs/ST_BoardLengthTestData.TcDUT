@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_BoardLengthTestData" Id="{6ebdd11c-2540-4aad-a909-25571dd4d011}">
+    <Declaration><![CDATA[TYPE
+    ST_BoardLengthTestData : STRUCT
+        VelocityArray : ARRAY[1..10] OF ST_BoardLengthTest;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

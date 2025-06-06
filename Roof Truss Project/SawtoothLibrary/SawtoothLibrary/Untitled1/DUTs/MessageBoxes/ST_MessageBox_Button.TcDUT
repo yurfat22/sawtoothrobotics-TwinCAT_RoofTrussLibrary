@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MessageBox_Button" Id="{4b0a42e1-0799-40a2-a1f0-566dc3d51a36}">
+    <Declaration><![CDATA[TYPE
+    ST_MessageBox_Button : STRUCT
+        Text    : STRING;
+        Visible : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

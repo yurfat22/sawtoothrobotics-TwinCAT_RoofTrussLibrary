@@ -1,0 +1,421 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Robot" Id="{1600db56-8704-42a5-b4ed-9569364dccae}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Robot EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    ipSubModules_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_PackML_BaseModule := [];
+
+    // Component definitions here
+
+    Robot : FB_Component_Robot := (Name := 'Robot');
+
+END_VAR
+
+VAR
+
+    //Properties
+    DetailIndex : UDINT := 1;
+
+    Handshake_Step : DINT;
+
+    _DryRun : BOOL;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{f5633602-59b7-4bc0-9d4d-ad1c9ac3c89c}" />
+    <Folder Name="Methods" Id="{3c285524-643a-4343-a43c-a6df2c090b43}">
+      <Folder Name="ActingStates" Id="{e4c87074-4e3f-4b79-aa36-c3b0b3bf226d}" />
+      <Folder Name="CommandSteps" Id="{61add708-9f29-4d83-adda-d2dcfb977e3f}" />
+      <Folder Name="WaitingStates" Id="{07ea4080-d9c0-4b39-9c64-a0a78873d1a8}" />
+    </Folder>
+    <Folder Name="Properties" Id="{e67c342a-5979-4627-bde3-a6f0dcd900b1}" />
+    <Method Name="Aborting" Id="{52fe1441-b0c0-423d-9d7a-ac2b065483cc}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Aborting
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Handshake_Step                      := 0;
+Robot.Handshake.OUT.Execute_Step    := FALSE;
+Robot.Handshake.OUT.Execute_StepNum := 0;
+DetailIndex                         := 1;
+
+Super^.Aborting();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Clearing" Id="{f68b84fa-c8c7-4a58-bb40-a12a77c808f3}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Clearing
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Super^.Clearing();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Completing" Id="{2b2dd47a-19b1-4d47-9ce0-79bec958c7ba}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Completing
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Super^.Completing();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{86d8ffcb-cac6-4160-a90f-d2a7ddb84e46}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR
+
+VAR
+
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+//SimulationOn();
+
+// transfer var from EM to COMP
+
+// IF _Name = 'Robot 1' THEN
+
+//     Robot.RobotType := 'Handling';
+
+// ELSIF _Name = 'Robot 2' OR _Name = 'Robot 3' THEN
+
+//     Robot.RobotType := 'Fastening';
+
+// END_IF
+
+SUPER^.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogicSimulation" Id="{bb36d491-7e01-412f-8551-94b1c8ee0781}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogicSimulation : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="DryRun" Id="{da5aa395-7e05-4bdc-a91b-eeaac04ecb7f}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY DryRun : BOOL]]></Declaration>
+      <Get Name="Get" Id="{daac72f7-740e-4db6-a60b-9ab977f41f44}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[DryRun := _DryRun;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{ecd88f42-46af-4430-82a5-7fa5e4ab3904}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_DryRun := DryRun;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Execute" Id="{18abe9ef-2c11-4fb0-bebc-eb0dad52c857}" FolderPath="Methods\WaitingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Execute
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//  logic
+WaitSync_Robot();
+
+SubModuleMonitor();
+
+SUPER^.Execute();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExtractNumFromString" Id="{96ae7f73-9467-4376-97ac-565ef616bc89}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ExtractNumFromString : DINT
+VAR_INPUT
+    InputString : STRING;
+END_VAR
+
+VAR
+    NumberString : STRING     := ''; // Temporary string to collect digits
+    Numbers      : STRING[10] := '0123456789'; // Temporary string to collect digits
+    CurrentChar  : BYTE; // Current character being processed
+    Result       : UDINT := 0; // Final extracted number as UDINT
+    i            : INT   := 1; // String index
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExtractNumFromString := 0;
+j                    := 0;
+
+FOR i := 0 TO LEN(InputString) DO
+    CurrentChar := InputString[i];
+
+    // Check if the current character is a digit
+    IF CurrentChar >= Numbers[0] AND CurrentChar <= Numbers[9] THEN
+        NumberString[j] := CurrentChar;
+        j               := j + 1;
+    END_IF
+END_FOR
+
+// Check for a number at the end of the string
+IF LEN(NumberString) > 0 THEN
+    ExtractNumFromString := STRING_TO_DINT(NumberString); // Convert to UDINT
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{28ac312f-fa82-4879-a674-1e946a88b00e}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Holding" Id="{b5937811-ff21-403d-b459-8391def9849f}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Holding
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Robot.Handshake.IN.TaskRunning = FALSE THEN
+    SUPER^.Holding();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{33c7f9f5-feaf-4676-a2d5-65fc51e632d6}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(Robot);
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="NailPlate" Id="{f9b4837a-7316-49e5-92b5-e453cd7a3b8c}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD NailPlate : BOOL
+VAR_INPUT
+    Step : ST_CSV_Step;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// clear out array first
+Robot.Clear_DataToSend();
+
+// first entry is always step type
+Robot.RecipeData_ToSend[1] := DINT_TO_USINT(E_CommandName.NailPlate);
+
+// Robot.RecipeData_ToSend[2] := INT_TO_USINT(Plates[1].PlateNumber);
+// 
+// Robot.RecipeData_ToSend[3] := STRING_TO_USINT(Plates[1].PlateGauge);
+// 
+// Robot.RecipeData_ToSend[4] := LREAL_TO_USINT(TRUNC(Plates[1].PlateWidth * 10));
+// 
+// Robot.RecipeData_ToSend[5] := LREAL_TO_USINT(TRUNC(Plates[1].PlateHeight * 10));
+// 
+// Robot.RecipeData_ToSend[6] := LREAL_TO_USINT(TRUNC(Plates[1].PlatePlaceX * 10));
+// 
+// Robot.RecipeData_ToSend[7] := LREAL_TO_USINT(TRUNC(Plates[1].PlatePlaceY * 10));
+// 
+// Robot.RecipeData_ToSend[8] := LREAL_TO_USINT(TRUNC(Plates[1].PlatePlaceAngle * 10));
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="OtherInputs" Id="{a2feda0e-e90f-4cdb-9a98-8d142025e152}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OtherInputs : ARRAY[0..7] OF USINT]]></Declaration>
+      <Get Name="Get" Id="{572b02f7-6655-4d44-80d3-63a1e37224b6}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[OtherInputs := Robot.OtherInputs;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="OtherOutputs" Id="{99596f22-c2b6-4278-88d3-85609ab5cea5}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OtherOutputs : ARRAY[0..7] OF USINT]]></Declaration>
+      <Set Name="Set" Id="{3263d4a6-5777-4a6d-bfd6-f347c43b4776}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Robot.OtherOutputs := OtherOutputs;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Resetting" Id="{99efc620-e8f8-4a41-a023-b4a190f05cc0}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Resetting
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// reset handshake step
+Handshake_Step                      := 0;
+Robot.Handshake.OUT.Execute_Step    := FALSE;
+Robot.Handshake.OUT.Execute_StepNum := 0;
+DetailIndex                         := 1;
+
+Super^.Resetting();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Starting" Id="{4000ad44-a0ea-48be-8105-bb74b62288e7}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Starting
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Handshake_Step                      := 0;
+Robot.Handshake.OUT.Execute_Step    := FALSE;
+Robot.Handshake.OUT.Execute_StepNum := 0;
+DetailIndex                         := 1;
+
+Super^.Starting();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stopping" Id="{eb73f352-8881-4097-9d33-887f0f0cd3cb}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Stopping
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Super^.Stopping();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SubModuleMonitor" Id="{0f055ad8-7d39-4dd2-85e3-da4c2757804c}">
+      <Declaration><![CDATA[(*! @summary This method monitors <b>submodules</b> within this PackML module and initiates fault responses as required*)
+METHOD PROTECTED SubModuleMonitor : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.SubModuleMonitor();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspending" Id="{34e4640b-ef80-4f78-8429-8e25e6825505}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Suspending
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Robot.Handshake.IN.TaskRunning = FALSE THEN
+    SUPER^.Suspending();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unholding" Id="{2732c77c-cdba-42a7-9acd-90f892d1f837}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Unholding
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Unholding();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unsuspending" Id="{1191d78b-8f90-4456-96f4-d6ad410ed060}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Unsuspending
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Robot.Handshake.IN.TaskRunning OR _InSimulation OR _ForceHold THEN
+    SUPER^.Unsuspending();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="WaitSync_Robot" Id="{b1c430e7-ca0e-4ee7-8ade-43f3ebe7a29d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD WaitSync_Robot : BOOL
+VAR
+END_VAR
+
+VAR_INST
+    State : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE State OF
+    0:
+        IF Robot.Handshake.IN.SubStepNumber > E_WaitSync.EMPTY THEN
+            State := 1;
+        END_IF
+
+    1:
+        _RequestedWaitSync := Robot.Handshake.IN.SubStepNumber;
+
+        IF _RequestedWaitSync = _ResponseWaitSync THEN
+            State := 2;
+        END_IF
+
+    2:
+        Robot.Handshake.OUT.SubStepResponse := _ResponseWaitSync;
+
+        IF Robot.Handshake.IN.SubStepNumber = E_WaitSync.EMPTY THEN
+            _RequestedWaitSync := Robot.Handshake.IN.SubStepNumber;
+
+            IF _ResponseWaitSync = E_WaitSync.EMPTY THEN
+                Robot.Handshake.OUT.SubStepResponse := E_WaitSync.EMPTY;
+                State                               := 0;
+            END_IF
+        END_IF
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

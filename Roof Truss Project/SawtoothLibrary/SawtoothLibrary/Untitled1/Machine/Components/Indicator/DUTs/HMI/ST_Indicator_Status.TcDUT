@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Indicator_Status" Id="{7f662d87-a5e6-4516-86b9-34bc91b40cf7}">
+    <Declaration><![CDATA[TYPE
+    ST_Indicator_Status : STRUCT
+        On       : BOOL;
+        Off      : BOOL;
+        Flashing : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

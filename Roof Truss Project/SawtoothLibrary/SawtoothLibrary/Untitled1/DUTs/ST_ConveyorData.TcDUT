@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_ConveyorData" Id="{f7ff1ecc-2e70-4bf2-9395-4f5ef5cc81eb}">
+    <Declaration><![CDATA[TYPE
+    ST_ConveyorData : STRUCT
+        ConveyorID       : STRING;
+        ConveyorStateStr : STRING;
+        TargetPos        : LREAL;
+        State            : E_Outfeed_Conveyor_State := E_Outfeed_Conveyor_State.IDLE;
+        TrussInfo        : ST_TrussInfo;
+        CurrentTruss     : STRING;
+        BoardsPresent    : ARRAY[1..50] OF ST_PickPlace;
+
+        ActualPosition : LREAL;
+
+        ReadyToIndexHalf      : BOOL;
+        HalfIndexCompleted    : BOOL;
+        SubState              : E_Outfeed_Conveyor_SubState := E_Outfeed_Conveyor_SubState.CONV_MOVE_ASSIGN;
+        ConveyorLength        : LREAL                       := 7075; //mm
+        ReadyToIndex          : BOOL                        := FALSE;
+        ReadyToOutfeed        : BOOL                        := FALSE;
+        ReadyToReceive        : BOOL                        := FALSE;
+        ReadyForSlideOut      : BOOL                        := FALSE;
+        ClearConveyor         : BOOL                        := FALSE;
+        ConveyorVelocity      : INT                         := 500;
+        ManualControlSelected : BOOL                        := FALSE;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

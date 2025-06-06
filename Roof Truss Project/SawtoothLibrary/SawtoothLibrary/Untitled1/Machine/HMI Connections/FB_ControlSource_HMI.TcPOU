@@ -1,0 +1,155 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_ControlSource_HMI" Id="{091ce15b-bf50-472e-bec9-145eaa7198cb}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ControlSource_HMI EXTENDS FB_CyclicFB IMPLEMENTS I_PackML_ExternalController
+VAR_INPUT
+    MainPMLControl_Simplified : ST_PackML_Control_Simplified;
+END_VAR
+
+VAR_OUTPUT
+END_VAR
+
+VAR
+    ipModule                : I_PackML_Control;
+    MainPMLControl_Standard : ST_PackML_Control;
+    R_HMICommand            : R_TRIG;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{6bb62e41-f054-4868-b617-445a55e124db}" />
+    <Folder Name="I_PackML_ExternalController" Id="{fd9fff61-8331-4d6c-ac4f-2a5bed3afb83}" />
+    <Property Name="Control" Id="{1e83ad3a-d2c0-4737-abff-733dca6f98bb}" FolderPath="I_PackML_ExternalController\">
+      <Declaration><![CDATA[PROPERTY Control : SPT_BaseTypes.I_PackML_Control]]></Declaration>
+      <Set Name="Set" Id="{95ef39fe-8953-4023-b509-05a3268f8b78}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ipModule := Control;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="CyclicLogic" Id="{92b0bc64-23db-46c7-97b9-0f05a3ec503a}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR
+    i : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+MainPMLControl_Standard.CurrentMode  := ipModule.CurrentMode;
+MainPMLControl_Standard.CurrentState := ipModule.CurrentState;
+
+FOR i := 1 TO 5 DO
+    MainPMLControl_Standard.ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+END_FOR
+
+//Process HMI requests
+R_HMICommand(CLK := (MainPMLControl_Simplified.ResetPressed XOR
+                    MainPMLControl_Simplified.StartPressed XOR
+                    MainPMLControl_Simplified.HoldPressed XOR
+                    MainPMLControl_Simplified.AbortPressed XOR
+                    MainPMLControl_Simplified.StopPressed) XOR
+                    (MainPMLControl_Standard.StateCommand <> E_PMLCommand.ePMLCommand_Undefined AND
+                    ipModule.StateCommand <> MainPMLControl_Standard.StateCommand) XOR
+                    (ipModule.ModeCommand <> MainPMLControl_Standard.ModeCommand));
+
+IF R_HMICommand.Q THEN
+    IF MainPMLControl_Simplified.ResetPressed AND
+       MainPMLControl_Simplified.ResetPermissive AND
+       MainPMLControl_Standard.CurrentState = E_PMLState.ePMLState_Aborted THEN
+        ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Clear);
+    ELSIF MainPMLControl_Simplified.ResetPressed AND MainPMLControl_Simplified.ResetPermissive THEN
+        ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Reset);
+    ELSIF MainPMLControl_Simplified.StartPressed AND MainPMLControl_Simplified.StartPermissive THEN
+        IF MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Idle THEN
+            ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Start);
+        ELSIF MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Held THEN
+            ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Unhold);
+        ELSIF MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Suspended THEN
+            ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Unsuspend);
+        END_IF
+    ELSIF MainPMLControl_Simplified.StopPressed AND MainPMLControl_Simplified.StopPermissive THEN
+        ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Stop);
+    ELSIF MainPMLControl_Simplified.AbortPressed AND MainPMLControl_Simplified.AbortPermissive THEN
+        ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Abort);
+    ELSIF MainPMLControl_Simplified.HoldPressed AND MainPMLControl_Simplified.HoldPermissive THEN
+        ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Hold);
+    ELSIF ipModule.StateCommand <> MainPMLControl_Standard.StateCommand THEN
+        ipModule.StateCommand := MainPMLControl_Standard.StateCommand;
+    ELSIF ipModule.ModeCommand <> MainPMLControl_Standard.ModeCommand THEN
+        ipModule.ModeCommand := MainPMLControl_Standard.ModeCommand;
+    END_IF
+END_IF
+
+MainPMLControl_Simplified.StartPermissive := MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Idle OR
+                                             MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Held OR
+                                             MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Suspended;
+
+MainPMLControl_Simplified.HoldPermissive := MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Execute OR
+                                            MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Unsuspending OR
+                                            MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Unholding;
+
+MainPMLControl_Simplified.StopPermissive := MainPMLControl_Simplified.AbortPermissive :=
+    MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Held OR
+    MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Suspended OR
+    MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Idle;
+
+MainPMLControl_Simplified.ResetPermissive := MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Complete OR
+                                             MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Stopped OR
+                                             MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Aborted;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ForceHoldRequested" Id="{fce98224-5e68-45f1-8fee-02548ab76d48}">
+      <Declaration><![CDATA[PROPERTY ForceHoldRequested : Bool]]></Declaration>
+      <Get Name="Get" Id="{371a43af-8f79-44d3-8dbf-9615f7478e1d}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ForceHoldRequested := (MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Unsuspending OR
+                      MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Unholding) AND
+                      MainPMLControl_Simplified.HoldPressed;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Initialize" Id="{d5cafecb-f2ed-406d-a756-a8ea8e0d1a9a}">
+      <Declaration><![CDATA[METHOD FINAL Initialize : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Registered THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ModeChanged" Id="{263e6af1-2ef9-482c-88cc-17fe81dc12d9}" FolderPath="I_PackML_ExternalController\">
+      <Declaration><![CDATA[METHOD FINAL ModeChanged
+VAR_INPUT
+    NewMode : SPT_BaseTypes.E_PMLUnitMode;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MainPMLControl_Standard.ModeCommand := NewMode;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Registered" Id="{0d53a14e-baa6-4ca3-b7f3-6a49911edc84}">
+      <Declaration><![CDATA[PROPERTY Registered : BOOL]]></Declaration>
+      <Get Name="Get" Id="{7ff5d7ac-84a0-461b-8525-235837abe738}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Registered := ipModule <> 0;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="StateChanged" Id="{ab077a61-0f1e-4ea9-a8fe-00a09fcf6396}" FolderPath="I_PackML_ExternalController\">
+      <Declaration><![CDATA[METHOD FINAL StateChanged
+VAR_INPUT
+    NewState : SPT_BaseTypes.E_PMLCommand;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MainPMLControl_Standard.StateCommand := NewState;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

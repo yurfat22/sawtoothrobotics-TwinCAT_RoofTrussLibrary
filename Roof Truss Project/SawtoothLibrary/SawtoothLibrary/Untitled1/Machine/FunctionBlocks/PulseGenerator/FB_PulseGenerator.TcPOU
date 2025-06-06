@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_PulseGenerator" Id="{2f67ad73-d935-486c-99d8-8cbf25147891}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_PulseGenerator
+VAR
+    PulseOn_TON  : TON;
+    PulseOff_TON : TON;
+    R_TRIG_0     : R_TRIG;
+    Pulse_TON    : TON;
+    OutRS        : RS;
+    _OnTime      : TIME := T#500MS;
+    _OffTime     : TIME := T#500MS;
+    _PulseOutput : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{eb58122e-03a9-4e13-bcd3-abc3260ce23f}" />
+    <Method Name="CyclicLogic" Id="{ee5adc93-9924-4c3e-a7be-2748fdab6080}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[PulseOn_TON(IN := PulseOutput, PT := _OnTime);
+PulseOff_TON(IN := NOT (PulseOutput), PT := _OffTime);
+OutRS(SET := PulseOff_TON.Q, RESET1 := PulseOn_TON.Q);
+_PulseOutput := OutRS.Q1;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="OffTime" Id="{f0bce5f0-e1eb-4294-a906-fdb262faf77f}">
+      <Declaration><![CDATA[PROPERTY OffTime : TIME]]></Declaration>
+      <Set Name="Set" Id="{6ac0044a-5770-41f9-8b6b-7e3a680f54f3}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_OffTime := OffTime;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="OnTime" Id="{c67bea88-764c-4168-aecd-4fd7c9ca4d8e}">
+      <Declaration><![CDATA[PROPERTY OnTime : TIME]]></Declaration>
+      <Set Name="Set" Id="{b5cc1cb7-41f8-4037-ba5d-bfba2fc154cf}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_OnTime := OnTime;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="PulseOutput" Id="{62e3112e-9d27-41cb-b215-c1827a8e3981}">
+      <Declaration><![CDATA[PROPERTY PulseOutput : BOOL]]></Declaration>
+      <Get Name="Get" Id="{701e808a-cd3a-40bf-8766-b267ed5bf3f1}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[PulseOutput := _PulseOutput;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>

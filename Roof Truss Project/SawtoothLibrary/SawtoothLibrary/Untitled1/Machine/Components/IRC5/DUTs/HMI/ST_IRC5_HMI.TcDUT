@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_IRC5_HMI" Id="{fd346695-5352-4815-8d07-0e3d25fc1d5e}">
+    <Declaration><![CDATA[TYPE
+    ST_IRC5_HMI : STRUCT
+        Config  : ST_MyComponent_Config;
+        Command : ST_MyComponent_Command;
+        Status  : ST_MyComponent_Status;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

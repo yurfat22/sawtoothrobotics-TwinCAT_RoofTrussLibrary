@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_BasicSlaveAxis_SoE" Id="{eb4aa2e9-6dd8-433e-9ae3-20bc0f68f3e5}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_BasicSlaveAxis_SoE EXTENDS FB_Component_BasicSlaveAxis IMPLEMENTS I_BasicAxis
+VAR
+    DriveReset  : FB_ResetRoutine_SoEDrive;
+    State_Reset : INT;
+    HomingInfo  : ST_HomingParams;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{09e89170-ea44-4267-817f-a90b7cb16729}" />
+    <Folder Name="Methods" Id="{b45a449e-e1a2-4333-89e0-dcd1008672e9}" />
+    <Folder Name="Properties" Id="{dce610d6-07bf-4b1e-8ca7-a968710da596}" />
+    <Method Name="CyclicLogic" Id="{c0c75779-1e1a-4a4f-945b-bdbe44e159ff}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[DriveReset.Axis := THIS^;
+DriveReset.CyclicLogic();
+
+SUPER^.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset" Id="{c1a961f4-b304-4ef3-a164-2fbb9c515ddd}" FolderPath="Methods\">
+      <Declaration><![CDATA[(*! @summary Clears error flags and error IDs for this component*)
+METHOD Reset : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Reset := FALSE;
+
+IF _Error THEN
+    CASE State_Reset OF
+        0:
+            DriveReset.Execute();
+            State_Reset := State_Reset + 10;
+            Trace('Drive Reset Called ');
+
+        10:
+            IF NOT DriveReset.Busy THEN
+                State_Reset := State_Reset + 10;
+                Trace('Drive Reset Done ');
+            END_IF
+
+        20:
+            IF SUPER^.Reset() THEN
+                Reset       := TRUE;
+                State_Reset := 0;
+            END_IF
+    END_CASE
+ELSE
+    IF SUPER^.Reset() THEN
+        Reset := TRUE;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

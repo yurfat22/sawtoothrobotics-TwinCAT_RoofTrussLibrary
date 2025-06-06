@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_PackML_Control_Simplified" Id="{decadb85-6d83-4937-b02d-bdb452e5ece9}">
+    <Declaration><![CDATA[TYPE
+    ST_PackML_Control_Simplified : STRUCT
+        AbortPermissive     : BOOL;
+        HoldPermissive      : BOOL;
+        ResetPermissive     : BOOL;
+        StartPermissive     : BOOL;
+        StopPermissive      : BOOL;
+        AbortPressed        : BOOL;
+        HoldPressed         : BOOL;
+        ResetPressed AT %I* : BOOL;
+        StartPressed AT %I* : BOOL;
+        StopPressed  AT %I* : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

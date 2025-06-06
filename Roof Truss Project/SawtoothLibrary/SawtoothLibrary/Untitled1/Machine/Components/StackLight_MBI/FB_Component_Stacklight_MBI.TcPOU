@@ -1,0 +1,149 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_Stacklight_MBI" Id="{8fdbbabc-3054-41b2-ba2d-d845d08b80f6}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_Stacklight_MBI EXTENDS FB_ComponentBase_SR
+VAR
+    // Inputs
+
+    _SystemState        : Tc3_PackML_V2.E_PMLState;
+    _SystemErrorPresent : BOOL;
+
+    // Outputs
+
+    WhiteLight : FB_Component_Indicator;
+    AmberLight : FB_Component_Indicator;
+    Siren      : FB_Component_Indicator;
+
+    // HMI
+
+    // Alarms
+
+    StackLightAlarms : ARRAY[1..STACKLIGHT_ALARMS_COUNT] OF FB_TcAlarm;
+
+    // Internal variables
+
+END_VAR
+
+VAR CONSTANT
+    STACKLIGHT_ALARMS_COUNT : UDINT := 5;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{57fbdc41-8b26-490e-8866-d394370335eb}" />
+    <Folder Name="I_CyclicFB" Id="{971b1730-2d15-443a-a42b-d20a72bd56da}" />
+    <Folder Name="I_Stacklight" Id="{cf205039-1e68-4594-b2e8-c14aa7759b3c}" />
+    <Folder Name="Methods" Id="{c46b0911-f825-48b4-8c66-e652cbd64dea}" />
+    <Folder Name="Properties" Id="{f7003854-8d65-41f9-a027-3f37f3882185}" />
+    <Method Name="CreateEvents" Id="{dede3f35-bfae-4fc0-be78-cb1b05436239}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{6d2f907f-6799-4f10-8b95-fc4123900eb8}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+WhiteLight.CyclicLogic();
+AmberLight.CyclicLogic();
+Siren.CyclicLogic();
+
+// Component Error
+
+//{error 'Create Component has Error'}
+
+//_Error := TRUE;
+
+//_ErrorID := 9999;
+
+// Component Busy
+
+//{error 'Create Component is Busy'}
+
+IF TRUE THEN
+    _Busy := TRUE;
+ELSE
+    _Busy := FALSE;
+END_IF
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+////_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := StackLightAlarms, CurrentSeverity := _CurrentSeverity, Severity := _CurrentAlarmSeverity);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{8b2bad78-e5b1-456d-87fb-0e6621f9c794}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{d1442845-4f03-4c9c-a711-623fcd2da348}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MyOutput" Id="{6a502cdd-600f-42ea-b6c1-4cdfcce1606f}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MyOutput : Tc3_PackML_V2.E_PMLState]]></Declaration>
+      <Get Name="Get" Id="{b8362b83-5f1c-4d86-8c3d-466decf3d472}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MyOutput := _SystemState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{f3cd0802-78d8-4f91-8f01-bdc58ebf3eac}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SystemState := MyOutput;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="SystemErrorPresent" Id="{fa76db45-e0d6-4bfe-abbe-d5b832d0d8fd}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY SystemErrorPresent : BOOL]]></Declaration>
+      <Get Name="Get" Id="{e32a9a92-bd59-4835-bf49-702616973329}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SystemErrorPresent := _SystemErrorPresent;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{43845690-eb7a-488f-b59b-dcb1e9d0512a}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SystemErrorPresent := SystemErrorPresent;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

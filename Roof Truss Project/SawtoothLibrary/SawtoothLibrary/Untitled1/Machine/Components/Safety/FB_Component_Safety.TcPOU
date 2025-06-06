@@ -1,0 +1,646 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_Safety" Id="{29657758-fcb6-4ba5-8c96-d5b50e0e7590}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_Safety EXTENDS FB_ComponentBase_SR
+VAR_INPUT
+    _SystemState : Tc3_PackML_V2.E_PMLState;
+END_VAR
+
+VAR_OUTPUT
+END_VAR
+
+VAR CONSTANT
+    MAX_MGB_DOORS               : UDINT := 7;
+    MAX_ESTOPS                  : UDINT := 8;
+    MAX_LIGHT_CURTAINS          : UDINT := 4;
+    MAX_AREA_SCANNERS           : UDINT := 3;
+    COMPONENT_ALARM_COUNT       : UINT  := 9;
+    MAX_PREPLATE_DOORS          : UDINT := 5;
+    MAX_PREPLATE_LIGHT_CURTAINS : UDINT := 3;
+END_VAR
+
+VAR
+    //Alarming
+    ComponentAlarms : ARRAY[1..COMPONENT_ALARM_COUNT] OF FB_TcAlarm;
+
+    // Component definitions here
+    MGB_Door                      : ARRAY[1..MAX_MGB_DOORS] OF FB_Component_MGB_Door;
+    E_Stop                        : ARRAY[1..MAX_ESTOPS] OF FB_DualChannelMonitor;
+    E_Stop_Status                 : ARRAY[1..MAX_ESTOPS] OF ST_DualChannel_HMIStatus;
+    Light_Curtains                : ARRAY[1..MAX_LIGHT_CURTAINS] OF FB_DualChannelMonitor;
+    Light_Curtain_Status          : ARRAY[1..MAX_LIGHT_CURTAINS] OF ST_DualChannel_HMIStatus;
+    Area_Scanners                 : ARRAY[1..MAX_AREA_SCANNERS] OF FB_DigitalSensor;
+    Preplate_Doors                : ARRAY[1..MAX_PREPLATE_DOORS] OF FB_DualChannelMonitor;
+    Preplate_Door_Status          : ARRAY[1..MAX_PREPLATE_DOORS] OF ST_DualChannel_HMIStatus;
+    Light_Curtains_Preplate       : ARRAY[1..MAX_PREPLATE_LIGHT_CURTAINS] OF FB_DualChannelMonitor;
+    Light_Curtain_Preplate_Status : ARRAY[1..MAX_PREPLATE_LIGHT_CURTAINS] OF ST_DualChannel_HMIStatus;
+
+    FlashingLight : FB_PulseGenerator;
+
+    SafetyRUN     AT %Q* : BOOL := TRUE;
+    SafetyErrAckn AT %Q* : BOOL;
+    SafetyReset   AT %Q* : BOOL;
+
+    SafetyIsReset AT %I* : BOOL;
+    SS1Input      AT %I* : BIT;
+    SS1Output     AT %Q* : BIT;
+
+    AirPressureOK AT %I* : BOOL;
+
+    PrePlateAirPressureOK AT %I* : BOOL;
+
+    OutfeedSafetyReset AT %Q* : BOOL;
+
+    OutfeedSafetyIsReset AT %I* : BOOL;
+
+    AutostopIsReset AT %I* : BOOL;
+
+    OutfeedSafetyReset_Button3 AT %I* : BOOL;
+
+    OutfeedSafetyReset_Button2 AT %I* : BOOL;
+
+    OutfeedSafetyReset_HMI AT %I* : BOOL;
+
+    SafetyStop AT %Q* : BOOL;
+
+    SafetyOK_HMI_STATE : USINT;
+
+    AutoStopOK_HMI_STATE : USINT;
+
+    OutfeedAutoStopOK_HMI_STATE : USINT;
+
+    SafetyOK_HMI_TEXT : STRING;
+
+    AutoStopOK_HMI_TEXT : STRING;
+
+    OutfeedAutoStopOK_HMI_TEXT : STRING;
+
+    safetyState                   : USINT;
+    tempSafetyOK_Main             : BOOL;
+    tempSafetyCanBeReset_Main     : BOOL;
+    tempSafetyReset_Main          : BOOL;
+    tempSafetyOK_AutoStop         : BOOL;
+    tempSafetyCanBeReset_AutoStop : BOOL;
+    tempSafetyReset_AutoStop      : BOOL;
+    tempSafetyOK_Outfeed          : BOOL;
+    tempSafetyCanBeReset_Outfeed  : BOOL;
+    tempSafetyReset_Outfeed       : BOOL;
+    MainSafetyCanBeReset          : BOOL;
+    AutoStopSafetyCanBeReset      : BOOL;
+    OutfeedSafetyCanBeReset       : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{0f0cd950-5375-4c6e-83b7-59025d894b3b}" />
+    <Folder Name="I_CyclicFB" Id="{7efed651-7b7f-48f1-8dd1-6ed06c3bba64}" />
+    <Folder Name="Methods" Id="{db2579d9-64da-42be-b09d-ae73355fd73b}" />
+    <Folder Name="Properties" Id="{ede94398-9755-492c-b20b-7b6b68633301}" />
+    <Property Name="AutostopOK" Id="{c4b4d5cf-be1a-4d7c-950e-8aca82561998}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY AutostopOK : bool]]></Declaration>
+      <Get Name="Get" Id="{52a8c161-6c37-4c18-ad25-76fe86fb0d94}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[AutostopOK := AutostopIsReset OR _Simulate;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="CreateEvents" Id="{79ec8def-1141-432e-be5f-988c6d341792}" FolderPath="Methods\">
+      <Declaration><![CDATA[(*! @summary Initializes event function blocks using this components's name*)
+METHOD PROTECTED CreateEvents]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_CreateAllEventsInClass(Alarms     := ComponentAlarms,
+                         ClassSize  := SIZEOF(TC_EVENTS.AMDTruss),
+                         pInitEvent := ADR(TC_EVENTS.AMDTruss.InitReferenceEvent),
+                         Prefix     := _Name);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{022ec067-829c-494a-97a6-03355d48134e}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// MGB_Door Names
+
+MGB_Door[1].Name := 'Infeed';
+MGB_Door[2].Name := 'Pre-Press';
+MGB_Door[3].Name := 'Post_Press';
+MGB_Door[4].Name := 'Assembly';
+MGB_Door[5].Name := 'Jig_3 Door';
+MGB_Door[6].Name := 'Jig_2 Door';
+MGB_Door[7].Name := 'Preplate Cell'; // Button box and estop combined into "MGB Door" 
+
+//Estop names
+E_Stop[1].Name := 'MBI 1';
+E_Stop[2].Name := 'MBI 1 Cable';
+E_Stop[3].Name := 'MBI 2';
+E_Stop[4].Name := 'MBI 2 Cable';
+E_Stop[5].Name := 'HMI';
+E_Stop[6].Name := 'Jig 3 Pendant';
+E_Stop[7].Name := 'Jig 2 Pendant';
+E_Stop[8].Name := 'Roof Truss Core';
+
+//Outfeed Light curtain names
+Light_Curtains[1].Name := 'Curtain 1';
+Light_Curtains[2].Name := 'Curtain 2';
+Light_Curtains[3].Name := 'Curtain 3';
+Light_Curtains[4].Name := 'Curtain 4';
+
+//Preplate Light curtain names
+Light_Curtains_Preplate[1].Name := 'Curtain 1';
+Light_Curtains_Preplate[2].Name := 'Curtain 2';
+Light_Curtains_Preplate[3].Name := 'Curtain 3';
+
+//Outfeed Light curtain names
+Preplate_Doors[1].Name := 'Rack 1';
+Preplate_Doors[2].Name := 'Rack 2';
+Preplate_Doors[3].Name := 'Rack 3';
+Preplate_Doors[4].Name := 'Rack 4';
+Preplate_Doors[5].Name := 'Rack 5';
+
+HMI_Status_Estops();
+HMI_Status_LightCurtains();
+HMI_Status_Preplate();
+
+FOR i := 1 TO MAX_PREPLATE_DOORS DO
+    Preplate_Doors[i].CyclicLogic();
+    Preplate_Doors[i].InSimulation := _Simulate;
+END_FOR
+
+FOR i := 1 TO MAX_PREPLATE_LIGHT_CURTAINS DO
+    Light_Curtains_Preplate[i].CyclicLogic();
+    Light_Curtains_Preplate[i].InSimulation := _Simulate;
+END_FOR
+
+// Initialise Component
+
+FlashingLight.OffTime := T#500MS;
+FlashingLight.OnTime  := T#500MS;
+
+FlashingLight.CyclicLogic();
+
+MainSafetyCanBeReset := TRUE;
+
+FOR i := 1 TO MAX_ESTOPS DO
+    MainSafetyCanBeReset := MainSafetyCanBeReset AND E_Stop[i].BothChannelsOK;
+END_FOR
+
+FOR i := 1 TO MAX_MGB_DOORS DO
+    MainSafetyCanBeReset := MainSafetyCanBeReset AND MGB_Door[i].Estop_CH_OK;
+END_FOR
+
+HMI_Indicators(Area             := 'Main',
+               HMI_Text         := SafetyOK_HMI_TEXT,
+               HMI_State        := SafetyOK_HMI_STATE,
+               SafetyOK         := SafetyIsReset OR (_Simulate AND tempSafetyOK_Main),
+               SafetyCanBeReset := MainSafetyCanBeReset,
+               SafetyReset      := SafetyReset OR (tempSafetyReset_Main AND _Simulate));
+
+IF MainSafetyCanBeReset AND _Simulate AND SafetyReset THEN
+    tempSafetyOK_Main := TRUE;
+ELSIF MainSafetyCanBeReset = FALSE THEN
+    tempSafetyOK_Main := FALSE;
+END_IF
+
+AutoStopSafetyCanBeReset := TRUE;
+
+FOR i := 1 TO MAX_MGB_DOORS - 2 DO
+    AutoStopSafetyCanBeReset := AutoStopSafetyCanBeReset AND MGB_Door[i].AutoStop_CH_OK;
+END_FOR
+
+AutoStopSafetyCanBeReset := MainSafetyCanBeReset AND AutoStopSafetyCanBeReset;
+
+HMI_Indicators(Area             := 'AutoStop',
+               HMI_Text         := AutoStopOK_HMI_TEXT,
+               HMI_State        := AutoStopOK_HMI_STATE,
+               SafetyOK         := (AutostopIsReset AND SafetyIsReset) OR (_Simulate AND tempSafetyOK_AutoStop),
+               SafetyCanBeReset := AutoStopSafetyCanBeReset,
+               SafetyReset      := FALSE);
+
+IF AutoStopSafetyCanBeReset AND _Simulate THEN
+    tempSafetyOK_AutoStop := TRUE;
+ELSIF AutoStopSafetyCanBeReset = FALSE THEN
+    tempSafetyOK_AutoStop := FALSE;
+END_IF
+
+OutfeedSafetyCanBeReset := TRUE;
+
+FOR i := 1 TO MAX_LIGHT_CURTAINS DO
+    OutfeedSafetyCanBeReset := Light_Curtains[i].BothChannelsOK AND OutfeedSafetyCanBeReset;
+END_FOR
+
+OutfeedSafetyCanBeReset := MGB_Door[5].AutoStop_CH_OK AND OutfeedSafetyCanBeReset;
+OutfeedSafetyCanBeReset := MGB_Door[6].AutoStop_CH_OK AND OutfeedSafetyCanBeReset;
+OutfeedSafetyCanBeReset := MainSafetyCanBeReset AND OutfeedSafetyCanBeReset;
+
+HMI_Indicators(Area             := 'Outfeed',
+               HMI_Text         := OutfeedAutoStopOK_HMI_TEXT,
+               HMI_State        := OutfeedAutoStopOK_HMI_STATE,
+               SafetyOK         := (OutfeedSafetyIsReset AND SafetyIsReset) OR (_Simulate AND tempSafetyOK_Outfeed),
+               SafetyCanBeReset := OutfeedSafetyCanBeReset,
+               SafetyReset      := OutfeedSafetyReset OR (tempSafetyReset_Outfeed AND _Simulate));
+
+IF OutfeedSafetyCanBeReset AND _Simulate AND OutfeedSafetyReset THEN
+    tempSafetyOK_Outfeed := TRUE;
+ELSIF OutfeedSafetyCanBeReset = FALSE THEN
+    tempSafetyOK_Outfeed := FALSE;
+END_IF
+
+SS1Output := NOT SS1Input;
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+IF SafetyReset THEN
+    SafetyErrAckn := TRUE;
+ELSE
+    SafetyErrAckn := FALSE;
+END_IF
+
+OutfeedSafetyReset := OutfeedSafetyReset_Button3 OR OutfeedSafetyReset_Button2 OR OutfeedSafetyReset_HMI;
+
+FOR i := 1 TO MAX_MGB_DOORS DO
+
+    MGB_Door[i].CyclicLogic();
+    MGB_Door[i].InSimulation := _Simulate;
+
+    //Button lights and lock
+
+    CASE _SystemState OF
+        ePMLState_Idle:
+            MGB_Door[i].Pause_LED.TurnOff();
+            MGB_Door[i].Resume_LED.Flash();
+            MGB_Door[i].Lock_Door.TurnOff();
+        ePMLState_Holding, ePMLState_Suspending:
+            MGB_Door[i].Pause_LED.Flash();
+            MGB_Door[i].Resume_LED.TurnOff();
+            MGB_Door[i].Lock_Door.TurnOn();
+        ePMLState_Held, ePMLState_Suspended:
+            MGB_Door[i].Pause_LED.TurnOff();
+            MGB_Door[i].Resume_LED.TurnOn();
+            MGB_Door[i].Lock_Door.TurnOff();
+        ePMLState_Starting, ePMLState_Unholding, ePMLState_Unsuspending:
+            MGB_Door[i].Pause_LED.TurnOff();
+            MGB_Door[i].Resume_LED.Flash();
+            MGB_Door[i].Lock_Door.TurnOn();
+        ePMLState_Execute:
+            MGB_Door[i].Pause_LED.TurnOn();
+            MGB_Door[i].Resume_LED.TurnOff();
+            MGB_Door[i].Lock_Door.TurnOn();
+    ELSE
+        MGB_Door[i].Pause_LED.TurnOff();
+        MGB_Door[i].Resume_LED.TurnOff();
+        MGB_Door[i].Lock_Door.TurnOff();
+    END_CASE
+
+    //estop light
+
+    IF SafetyIsReset THEN
+        MGB_Door[i].Estop_LED.TurnOff();
+    ELSE
+        IF MGB_Door[i].Estop_CH_OK THEN
+            MGB_Door[i].Estop_LED.Flash();
+        ELSE
+            MGB_Door[i].Estop_LED.TurnOn();
+        END_IF
+        MGB_Door[i].Lock_Door.TurnOff();
+    END_IF
+    MGB_Door[i].SafetyReset := SafetyReset;
+END_FOR
+
+FOR i := 1 TO MAX_ESTOPS DO
+    E_Stop[i].CyclicLogic();
+    E_Stop[i].InSimulation := _Simulate;
+
+    IF SafetyIsReset THEN
+        E_Stop[i].LED.TurnOff();
+    ELSE
+        IF E_Stop[i].BothChannelsOK THEN
+            E_Stop[i].LED.Flash();
+        ELSE
+            E_Stop[i].LED.TurnOn();
+        END_IF
+    END_IF
+END_FOR
+
+FOR i := 1 TO MAX_LIGHT_CURTAINS DO
+    Light_Curtains[i].CyclicLogic();
+    Light_Curtains[i].InSimulation := _Simulate;
+END_FOR
+
+SafetyStop := NOT (SafetyIsReset) OR NOT (AutostopIsReset);
+
+SUPER^.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMI_Indicators" Id="{e223f610-3ee9-43ed-b7e6-74276d84aaa5}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMI_Indicators
+
+VAR_INPUT
+    Area             : STRING;
+    HMI_Text         : REFERENCE TO STRING;
+    HMI_State        : REFERENCE TO USINT;
+    SafetyOK         : BOOL;
+    SafetyCanBeReset : BOOL;
+    SafetyReset      : BOOL;
+END_VAR
+
+VAR_INST
+    Gif_TON       : TON;
+    Safe_R_Trig_1 : R_TRIG;
+    Safe_R_Trig_2 : R_TRIG;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[
+Safe_R_Trig_1(CLK := SafetyOK);
+Safe_R_Trig_2(CLK := SafetyReset);
+
+IF Safe_R_Trig_1.Q THEN
+    safetyState := 1;
+END_IF
+
+IF SafetyOK = FALSE THEN
+    IF SafetyCanBeReset = FALSE THEN
+        safetyState := 10;
+    ELSE
+        safetyState := 20;
+    END_IF
+END_IF
+
+CASE safetyState OF
+    1:
+        HMI_Text  := CONCAT(Area, ' Safety OK');
+        HMI_State := 1;
+        Gif_TON(IN := FALSE);
+
+        IF Safe_R_Trig_2.Q THEN
+//             safetyState := 30;
+        END_IF
+
+    10:
+        HMI_Text  := CONCAT(Area, ' Safety Not OK');
+        HMI_State := 2;
+
+    20:
+        IF FlashingLight.PulseOutput THEN
+            HMI_State := 3;
+        ELSE
+            HMI_State := 4;
+        END_IF
+
+        HMI_Text := CONCAT(Area, ' Safety Needs Reset');
+
+    30:
+        Gif_TON(IN := TRUE, PT := T#1S);
+
+        IF Gif_TON.Q THEN
+            safetyState := 1;
+        END_IF
+
+        HMI_Text  := CONCAT(Area, ' Safety Already Reset...');
+        HMI_State := 5;
+
+    99:
+        ;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMI_Status_Estops" Id="{41ac1586-efb4-417f-ac74-3a7e6e0e3740}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMI_Status_Estops
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    EStop_R_TRIG    : ARRAY[1..MAX_ESTOPS] OF R_TRIG;
+    EstopPressed    : ARRAY[1..MAX_ESTOPS] OF BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO MAX_ESTOPS DO
+
+    EStop_R_TRIG[i](CLK := NOT (E_Stop[i].BothChannelsOK));
+
+    IF EStop_R_TRIG[i].Q THEN
+        EstopPressed[i] := TRUE;
+    END_IF
+
+    IF SafetyReset THEN
+        EstopPressed[i] := FALSE;
+    END_IF
+
+    E_Stop_Status[i].Name := E_Stop[i].Name;
+
+    IF EstopPressed[i] THEN
+        IF E_Stop[i].BothChannelsOK THEN
+            E_Stop_Status[i].Status_Usint := 4;
+            E_Stop_Status[i].Status_Str   := 'Reset Needed';
+        ELSE
+            E_Stop_Status[i].Status_Usint := 2;
+            E_Stop_Status[i].Status_Str   := 'Estop Pressed';
+        END_IF
+    ELSE
+        IF E_Stop[i].BothChannelsOK THEN
+            E_Stop_Status[i].Status_Usint := 1;
+            E_Stop_Status[i].Status_Str   := 'Estop OK';
+        ELSE
+            E_Stop_Status[i].Status_Usint := 2;
+            E_Stop_Status[i].Status_Str   := 'Estop Pressed';
+        END_IF
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMI_Status_LightCurtains" Id="{55c7a271-053b-45bd-a820-ce2e6277e22f}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMI_Status_LightCurtains
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    LC_R_TRIG    : ARRAY[1..MAX_ESTOPS] OF R_TRIG;
+    LC_Tripped    : ARRAY[1..MAX_ESTOPS] OF BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO MAX_LIGHT_CURTAINS DO
+
+    LC_R_TRIG[i](CLK := NOT (Light_Curtains[i].BothChannelsOK));
+
+    IF LC_R_TRIG[i].Q THEN
+        LC_Tripped[i] := TRUE;
+    END_IF
+
+    IF OutfeedSafetyReset THEN
+        LC_Tripped[i] := FALSE;
+    END_IF
+
+    Light_Curtain_Status[i].Name := Light_Curtains[i].Name;
+
+    IF LC_Tripped[i] THEN
+        IF Light_Curtains[i].BothChannelsOK THEN
+            Light_Curtain_Status[i].Status_Usint := 4;
+            Light_Curtain_Status[i].Status_Str   := 'Reset Needed';
+        ELSE
+            Light_Curtain_Status[i].Status_Usint := 2;
+            Light_Curtain_Status[i].Status_Str   := 'Curtain Tripped';
+        END_IF
+    ELSE
+        IF Light_Curtains[i].BothChannelsOK THEN
+            Light_Curtain_Status[i].Status_Usint := 1;
+            Light_Curtain_Status[i].Status_Str   := 'Curtain OK';
+        ELSE
+            Light_Curtain_Status[i].Status_Usint := 2;
+            Light_Curtain_Status[i].Status_Str   := 'Curtain Tripped';
+        END_IF
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMI_Status_Preplate" Id="{1f17b118-d14d-4f5b-99a9-6582dfcfbb3d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMI_Status_Preplate
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO MAX_PREPLATE_DOORS DO
+	Preplate_Door_Status[i].Name := Preplate_Doors[i].Name;
+    IF Preplate_Doors[i].BothChannelsOK THEN
+        Preplate_Door_Status[i].Status_Usint := 1;
+        Preplate_Door_Status[i].Status_Str   := 'Door Closed';
+    ELSE
+        Preplate_Door_Status[i].Status_Usint := 2;
+        Preplate_Door_Status[i].Status_Str   := 'Door Open';
+    END_IF
+END_FOR
+
+FOR i := 1 TO MAX_PREPLATE_LIGHT_CURTAINS DO
+	Light_Curtain_Preplate_Status[i].Name := Light_Curtains_Preplate[i].Name;
+    IF Light_Curtains_Preplate[i].BothChannelsOK THEN
+        Light_Curtain_Preplate_Status[i].Status_Usint := 1;
+        Light_Curtain_Preplate_Status[i].Status_Str   := 'Curtain Clear';
+    ELSE
+        Light_Curtain_Preplate_Status[i].Status_Usint := 2;
+        Light_Curtain_Preplate_Status[i].Status_Str   := 'Curtain Tripped';
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{7ab30dcd-b4c8-4eb8-9409-ebd9e97036b4}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{8a74232e-851b-4e20-b2f2-f9d4c4ec1edd}" FolderPath="Methods\">
+      <Declaration><![CDATA[(*! Provides basic error detection and event handling for this component*)
+METHOD PROTECTED Monitoring]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT AirPressureOK AND NOT ComponentAlarms[E_AMDTruss.LowAir].bRaised THEN
+    RaiseAlarm2Args(ComponentAlarms[E_AMDTruss.LowAir], 'Air is low in the system', 'Please Turn on Air Before Continuing');
+ELSIF AirPressureOK AND ComponentAlarms[E_AMDTruss.LowAir].bRaised THEN
+    ComponentAlarms[E_AMDTruss.LowAir].Clear(0, 0);
+END_IF
+
+IF NOT SafetyIsReset AND NOT ComponentAlarms[E_AMDTruss.WarnMessage].bRaised THEN
+    RaiseAlarm2Args(ComponentAlarms[E_AMDTruss.WarnMessage], 'Safety Reset Required', 'System Requires a Safety Reset to Continue');
+ELSIF SafetyIsReset AND ComponentAlarms[E_AMDTruss.WarnMessage].bRaised THEN
+    ComponentAlarms[E_AMDTruss.WarnMessage].Clear(0, 0);
+END_IF
+
+Super^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="OutfeedAutostopOK" Id="{5fbed430-e95a-45d0-a1bd-e924016d1a80}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OutfeedAutostopOK : bool]]></Declaration>
+      <Get Name="Get" Id="{61a3f5e2-3af1-4cbb-9751-bc2de7a28d8a}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[OutfeedAutostopOK := OutfeedSafetyIsReset OR _Simulate;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ParentResponseDefinitions" Id="{e781f32d-8837-4f5e-beca-2f92a2f463c7}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ParentResponseDefinitions : ARRAY[0..4] OF E_AlarmResponse]]></Declaration>
+      <Get Name="Get" Id="{f5483314-24d6-4e93-8ae9-cc483a2d5ceb}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ParentResponseDefinitions[TcEventSeverity.Verbose]  := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Info]     := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Warning]  := E_AlarmResponse.Suspend_Controlled;
+ParentResponseDefinitions[TcEventSeverity.Error]    := E_AlarmResponse.Suspend_Controlled;
+ParentResponseDefinitions[TcEventSeverity.Critical] := E_AlarmResponse.Suspend_Immediate;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="PauseInputs" Id="{db28324d-b3f3-4003-bfea-c04d66d91a87}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PauseInputs : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[PauseInputs := FALSE;
+
+FOR i := 1 TO MAX_MGB_DOORS DO
+    IF MGB_Door[i].Pause.Active THEN
+        PauseInputs := TRUE;
+        RETURN;
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ResumeInputs" Id="{f16f07ce-0c3d-4be4-a721-16ccf9384da6}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ResumeInputs : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ResumeInputs := FALSE;
+
+FOR i := 1 TO MAX_MGB_DOORS DO
+    IF MGB_Door[i].Resume.Active THEN
+        ResumeInputs := TRUE;
+        RETURN;
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="SafetyOK" Id="{3e42a329-767e-47e7-972a-3260d37ff33c}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY SafetyOK : BOOL]]></Declaration>
+      <Get Name="Get" Id="{1056f403-52ad-4586-a3f6-7493054a79f5}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SafetyOK := SafetyIsReset OR _Simulate;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="SystemState" Id="{0fd37e6b-46b7-4db5-a9d3-413a9664e3a0}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY SystemState : Tc3_PackML_V2.E_PMLState]]></Declaration>
+      <Get Name="Get" Id="{2c1ea18e-df8b-4bd5-a00f-7aa8e73874cb}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SystemState := _SystemState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{9380e5ab-2db8-4d7d-9383-fce232cc13a7}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SystemState := SystemState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

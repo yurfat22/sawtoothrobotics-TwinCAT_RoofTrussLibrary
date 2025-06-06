@@ -1,0 +1,304 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_ABB_VFD_EIP" Id="{d7c883d8-9a80-4490-8721-5b49535788c7}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_ABB_VFD_EIP EXTENDS FB_ComponentBase_SR IMPLEMENTS I_VFD
+VAR
+
+    // Outputs
+    _ControlWord  AT %Q* : UDINT;
+    _EnableMotor  AT %Q* : BOOL;
+    _FaultReset   AT %Q* : BOOL;
+    _Frequency    AT %Q* : WORD;
+    _JogFwd       AT %Q* : BOOL;
+    _JogRvs       AT %Q* : BOOL;
+    _ReferenceVel AT %Q* : INT;
+
+    // Inputs
+    _StatusWord   AT %I* : UDINT;
+    _Enabled      AT %I* : BOOL;
+    _CommandedVel AT %I* : INT;
+    _Faulted      AT %I* : BOOL;
+    _Warning      AT %I* : BOOL;
+    _FwdActive    AT %I* : BOOL;
+    _RvsActive    AT %I* : BOOL;
+    _AtSpeed      AT %I* : BOOL;
+    _State        AT %I* : USINT;
+    // Alarms
+
+    IndicatorAlarms : ARRAY[1..Indicator_ALARMS_COUNT] OF FB_TcAlarm;
+
+    // Internal variables
+
+    Pulse : FB_PulseGenerator;
+
+END_VAR
+
+VAR CONSTANT
+    Indicator_ALARMS_COUNT : UDINT := 5;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{1a5e26c8-b2f3-48e7-a1bd-08bf41235208}" />
+    <Folder Name="I_CyclicFB" Id="{eb6a33f2-dab4-4b32-b555-554d2e528154}" />
+    <Folder Name="I_Template" Id="{183fd5de-6fd6-4094-8b6c-f6a1478630c0}" />
+    <Folder Name="Methods" Id="{763dc642-d6a3-4de0-8949-b38f716aed4a}" />
+    <Folder Name="Properties" Id="{fdd6fdc2-f9a5-42e0-808c-d95da9152d52}" />
+    <Property Name="AtSpeed" Id="{c2da8d17-699a-49f6-af39-a4b992efc0ff}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY AtSpeed : bool]]></Declaration>
+      <Get Name="Get" Id="{5abf5cb0-02df-4bf6-b8f0-7bc3ec0179c8}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[AtSpeed := _AtSpeed;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="CommandedVel" Id="{b0de3e26-6282-46c9-bd2e-a0eb70bdfe2a}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY CommandedVel : WORD]]></Declaration>
+      <Get Name="Get" Id="{58167d8f-85e5-4ccf-bdb3-54158f8c1858}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[CommandedVel := INT_TO_WORD(_CommandedVel);]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="CyclicLogic" Id="{d2d3a928-681e-4a83-9ca4-5afec98e3054}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := IndicatorAlarms, CurrentSeverity := _CurrentAlarmSeverity);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Disable" Id="{48a91700-8815-4ae6-9d67-419b3f718794}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Disable : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Disable := FALSE;
+JogFwd  := FALSE;
+JogRvs  := FALSE;
+
+IF FwdActive = FALSE AND RvsActive = FALSE THEN
+    Disable := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Enable" Id="{88e8d06a-9202-4435-9e48-dc35cdfd49c5}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Enable : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Enable := FALSE;
+
+IF Enabled = TRUE THEN
+    Enable := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Enabled" Id="{87b27ac0-90ae-4aac-b832-a4d9894f7c2d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Enabled : bool]]></Declaration>
+      <Get Name="Get" Id="{13a12958-884c-4353-ad98-3dd077b92277}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Enabled := _Enabled;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Faulted" Id="{f5d8632e-5de6-4096-b6cd-0707a3edd885}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Faulted : bool]]></Declaration>
+      <Get Name="Get" Id="{94df74f0-88ad-4e88-8607-c9eaaff8eade}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Faulted := _Faulted;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="FaultReset" Id="{57c83385-b413-4b3f-98fe-795a3ecdb97d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY FaultReset : bool]]></Declaration>
+      <Set Name="Set" Id="{1128f766-22d8-4f5a-aeea-5d71e7c934d6}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_FaultReset := FaultReset;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Frequency" Id="{961a4f44-4f22-42b0-8bf5-04cfe60d005c}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Frequency : WORD]]></Declaration>
+      <Set Name="Set" Id="{4912c8bb-6b61-45dc-a5f4-dba304dabca4}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Frequency := Frequency;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="FwdActive" Id="{934d504a-32b1-4df8-9140-61eb45252847}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY FwdActive : bool]]></Declaration>
+      <Get Name="Get" Id="{096f03ae-9b52-4679-a289-e0bea8f0c2b2}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[FwdActive := _FwdActive;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Initialize" Id="{7525ad7f-fedd-4093-afbc-52ff4f72c67d}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Jog" Id="{01e5017e-389e-4b57-9256-54bd66bd446e}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Jog : BOOL
+VAR_INPUT
+    JogFW : BOOL := FALSE;
+    JogBW : BOOL := FALSE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF JogFW THEN
+    Jog    := FALSE;
+    JogFwd := TRUE;
+    JogRvs := FALSE;
+
+    IF FwdActive AND AtSpeed THEN
+        Jog := TRUE;
+    END_IF
+ELSIF JogBW THEN
+
+    Jog    := FALSE;
+    JogFwd := FALSE;
+    JogRvs := TRUE;
+
+    IF RvsActive AND AtSpeed THEN
+        Jog := TRUE;
+    END_IF
+
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="JogFwd" Id="{f1cf40b1-3c8f-4610-809b-55a9df906e26}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY JogFwd : bool]]></Declaration>
+      <Set Name="Set" Id="{a419c633-e6cb-494b-ac22-dd99adf9bbf6}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_JogFwd := JogFwd;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="JogRvs" Id="{90273be1-6d74-44bf-805d-8129fc7bffe1}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY JogRvs : bool]]></Declaration>
+      <Set Name="Set" Id="{2c05e736-3ca6-460a-8afd-51181de40399}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_JogRvs := JogRvs;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Monitoring" Id="{82edacc2-d19c-46ab-8bde-647fb714876b}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ReferenceVel" Id="{ca9163a7-2282-4e9c-b50b-f7494123140d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ReferenceVel : WORD]]></Declaration>
+      <Set Name="Set" Id="{f2a5b565-e49c-4c88-948f-a598b97020aa}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ReferenceVel := WORD_TO_INT(ReferenceVel);]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Reset" Id="{a6141c65-1bbe-4d24-acaa-584ea1a1b527}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Reset : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Reset := FALSE;
+
+IF Faulted THEN
+    FaultReset := TRUE;
+ELSE
+    FaultReset := FALSE;
+    Reset      := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="RvsActive" Id="{3b085962-a19d-40a1-8e73-192e429a5b37}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY RvsActive : bool]]></Declaration>
+      <Get Name="Get" Id="{0963eca2-f265-4d35-8393-393bb4ad9a82}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[RvsActive := _RvsActive;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="State" Id="{90420ee1-1438-4858-bdae-062d1682082d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY State : USINT]]></Declaration>
+      <Get Name="Get" Id="{6c665aaa-0f49-4427-b603-da46856d721e}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[State := _State;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Stop" Id="{3cc8b87d-7054-4d0c-bd81-a11eac31a237}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stop   := FALSE;
+JogFwd := FALSE;
+JogRvs := FALSE;
+
+IF FwdActive = FALSE AND RvsActive = FALSE THEN
+    Stop := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Warning" Id="{04d0b7f3-e15b-477e-877e-7f1a39342182}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Warning : bool]]></Declaration>
+      <Get Name="Get" Id="{a1a914df-feb7-4638-85d3-2e4aa1bd6d49}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Warning := _Warning;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>

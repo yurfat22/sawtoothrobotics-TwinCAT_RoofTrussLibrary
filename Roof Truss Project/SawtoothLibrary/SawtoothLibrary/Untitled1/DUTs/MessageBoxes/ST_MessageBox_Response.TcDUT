@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MessageBox_Response" Id="{a62e7db7-6278-488d-ac33-64b03a299723}">
+    <Declaration><![CDATA[TYPE
+    ST_MessageBox_Response : STRUCT
+        ErrorRaised      : BOOL;
+        ErrorAcknowledge : BOOL;
+        ErrorSolution    : USINT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

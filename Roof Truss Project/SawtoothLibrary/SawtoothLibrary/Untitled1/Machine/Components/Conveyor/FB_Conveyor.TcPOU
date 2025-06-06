@@ -1,0 +1,136 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Conveyor" Id="{5edb60ec-a104-4be8-a541-337a6b38c073}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Conveyor EXTENDS FB_Component_BasicSlaveAxis_SoE
+
+VAR CONSTANT
+    CONVEYOR_ALARMS_COUNT : USINT := 10;
+END_VAR
+
+VAR
+    ConveyorAlarms : ARRAY[1..CONVEYOR_ALARMS_COUNT] OF FB_TcAlarm;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{eddb681a-ace8-4a55-9624-5e2411bfff20}" />
+    <Folder Name="Methods" Id="{a8dbf044-c399-42a8-8007-9cf1f6848afa}" />
+    <Folder Name="Properties" Id="{df4852ce-7a7f-44fb-83aa-56d8c39119c9}" />
+    <Method Name="AlarmRaiseBasic" Id="{9c0bce6f-ad5d-4b4e-9940-ed9c6fbd9776}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD AlarmRaiseBasic : BOOL
+VAR_INPUT
+    alarm : E_OutfeedConveyor;
+    raise : BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF (NOT ConveyorAlarms[alarm].bRaised) AND raise THEN
+    // Raise alarm if we are NOT in auto
+    ConveyorAlarms[alarm].Raise(0);
+ELSIF ConveyorAlarms[alarm].bRaised AND NOT raise THEN
+    // Clear alarm if we return to auto
+    ConveyorAlarms[alarm].Clear(0, 0);
+END_IF;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CreateEvents" Id="{f62c56ae-2eb8-4a6d-9c82-92688ff5a13a}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// F_CreateAllEventsInClass(Alarms		:= ConveyorAlarms,
+// 						 ClassSize	:= SIZEOF(TC_EVENTS.OutfeedConveyor),
+// 						 pInitEvent := ADR(TC_EVENTS.OutfeedConveyor.InitReferenceEvent),
+// 						 Prefix		:= _Name);
+SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{41601d73-34e2-4870-a587-f5a9bd8e4dc3}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{fe6827d5-dd72-4130-9bee-86593fa4e47c}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// AlarmRaiseBasic(alarmlist := ConveyorAlarms,alarm := E_OutfeedConveyor.NoTrussData,NoTrussDataAlarm);
+
+//////////////////////////////////////////////////////////////////////////
+// Wrap-up: Evaluate overall severity, then run the extended Monitoring
+//////////////////////////////////////////////////////////////////////////
+_CurrentAlarmSeverity := TcEventSeverity.Verbose;
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := ConveyorAlarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+// Finally, run the extended monitoring
+SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ParentResponseDefinitions" Id="{7211572a-917f-4f01-8c71-89fe9bfce153}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ParentResponseDefinitions : ARRAY[0..4] OF E_AlarmResponse]]></Declaration>
+      <Get Name="Get" Id="{5418daaf-537a-4820-befb-d351e7536519}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ParentResponseDefinitions[TcEventSeverity.Verbose]  := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Info]     := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Warning]  := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Error]    := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Critical] := E_AlarmResponse.Suspend_Immediate;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="SimHoming" Id="{c3104ee2-06f6-44c9-82ca-6e57aa7f88bd}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD SimHoming : BOOL
+VAR_INPUT
+    Motor  : REFERENCE TO FB_Component_BasicSlaveAxis_SoE;
+    SimPos : LREAL;
+END_VAR
+
+VAR_INST
+    _SimHomingState : USINT;
+    _SetPositionSim : FB_HomeRoutine_SetPosition;
+    Timeout_TON     : TON;
+    TimeoutCount    : USINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE _SimHomingState OF
+    0:
+        SimHoming                    := FALSE;
+        Motor.HomeMethod             := _SetPositionSim;
+        _SetPositionSim.HomePosition := SimPos;
+        _SetPositionSim.Execute();
+        _SimHomingState := 10;
+        Timeout_TON(IN := FALSE, PT := T#500MS);
+
+    10:
+        Timeout_TON(IN := TRUE, PT := T#500MS);
+
+        IF _SetPositionSim.Busy = FALSE AND ABS(Motor.ActualPosition - SimPos) < 1 THEN
+            _SimHomingState := 20;
+        END_IF
+
+        IF Timeout_TON.Q THEN
+
+            IF TimeoutCount <= 3 THEN
+                _SimHomingState := 0;
+                TimeoutCount    := TimeoutCount + 1;
+            ELSE
+                _SimHomingState := 15;
+            END_IF
+        END_IF
+
+    15:
+
+        //Warning, Home didn't work
+    20:
+        SimHoming       := TRUE;
+        _SimHomingState := 0;
+        TimeoutCount    := 0;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

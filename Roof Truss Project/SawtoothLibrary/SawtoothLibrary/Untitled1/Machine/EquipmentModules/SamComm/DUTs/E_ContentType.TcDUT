@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_ContentType" Id="{dc42a809-c0ec-4bbb-9f9e-7f8263d250ea}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_ContentType : (
+        CT_NONE,
+        CT_JSON,
+        CT_CSV,
+        CT_NOTASK,
+        CT_NAK,
+        CT_ACK,
+        CT_MAX
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

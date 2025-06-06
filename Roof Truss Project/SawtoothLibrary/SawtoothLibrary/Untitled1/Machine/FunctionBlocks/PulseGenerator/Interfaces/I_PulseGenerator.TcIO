@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_PulseGenerator" Id="{0756d7c2-51cd-4fe9-80cf-918d0497ddcc}">
+    <Declaration><![CDATA[INTERFACE I_PulseGenerator]]></Declaration>
+    <Property Name="OffTime" Id="{6782cb97-b0d8-4682-88b3-f4737668bd0f}">
+      <Declaration><![CDATA[PROPERTY PUBLIC OffTime : TIME]]></Declaration>
+      <Get Name="Get" Id="{2d4befec-f056-441d-89b5-716726d9dfe1}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{2af761cc-c488-4596-b7b4-6d137f8aeb94}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="OnTime" Id="{3c55e3ec-b945-4b77-96fd-30b9738ccbf2}">
+      <Declaration><![CDATA[PROPERTY PUBLIC OnTime : TIME]]></Declaration>
+      <Get Name="Get" Id="{e51464ca-7a2f-40c3-bc16-9fdb458a62df}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{c2a25729-e8b5-4def-b453-dbbd953b63c3}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="PulseOutput" Id="{a3847c59-580d-4bd8-993e-f6c323a5816b}">
+      <Declaration><![CDATA[PROPERTY PUBLIC PulseOutput : BOOL]]></Declaration>
+      <Get Name="Get" Id="{e00a45a7-350b-4bfe-89b8-a81a71256ca9}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+    </Property>
+  </Itf>
+</TcPlcObject>

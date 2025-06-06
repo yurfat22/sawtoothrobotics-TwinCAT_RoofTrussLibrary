@@ -1,0 +1,225 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_ABB_VFD_EC" Id="{6f6168d3-648c-439b-ba1f-f93b55a3c7d0}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_ABB_VFD_EC EXTENDS FB_ComponentBase IMPLEMENTS I_VFD
+VAR_INPUT
+END_VAR
+
+VAR_OUTPUT
+END_VAR
+
+VAR
+
+    //ABB	: AXIS_Ref;
+    ABB_State : INT;
+    AbsVel    : INT := 1200;
+    DirPos    : INT := -1;
+    DirNeg    : INT := 1;
+
+    // ABB Drive StatusWord
+    ABBSW           AT %I* : UINT;
+    ReadySwOn       AT %I* : BOOL;
+    SwitchedOn      AT %I* : BOOL;
+    OpEnabled       AT %I* : BOOL;
+    Fault           AT %I* : BOOL;
+    VoltageEnable   AT %I* : BOOL;
+    QuickStopActive AT %I* : BOOL;
+    SwitchOnDisable AT %I* : BOOL;
+    Warning         AT %I* : BOOL;
+    AtSetpoint      AT %I* : BOOL;
+    Remote          AT %I* : BOOL;
+    InternalLimit   AT %I* : BOOL;
+
+    // ABB Drive ControlWord
+    ABBCW         AT %Q* : UINT;
+    Vel           AT %Q* : INT;
+    SwitchOn      AT %Q* : BOOL;
+    EnableVoltage AT %Q* : BOOL;
+    QuickStop     AT %Q* : BOOL;
+    EnableOp      AT %Q* : BOOL;
+    RampOut       AT %Q* : BOOL;
+    RampHold      AT %Q* : BOOL;
+    RampIn        AT %Q* : BOOL;
+    bReset        AT %Q* : BOOL;
+    RemoteCmd     AT %Q* : BOOL;
+    ExtCntrl      AT %Q* : BOOL;
+
+    //Motion Command and Limit Switches
+    DriveSW AT %I* : UINT;
+    DriveCW AT %Q* : UINT;
+
+    LimitSwitchExt AT %I* : BOOL;
+    LimitSwitchRet AT %I* : BOOL;
+
+    _Extended  : BOOL;
+    _Retracted : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{e9a7caed-e170-4b10-800b-4be9b5b41d6e}" />
+    <Folder Name="I_VFD" Id="{fb3c2aa1-5931-42da-8d16-de41b4179bd0}" />
+    <Folder Name="Properties" Id="{eceb8b4e-a060-4961-92bf-dd6f47fc9ec7}" />
+    <Method Name="CyclicLogic" Id="{fcd056ba-c967-4fe4-9ac7-84968331ebbb}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ABBCW.0  := SwitchOn;
+ABBCW.1  := EnableVoltage;
+ABBCW.2  := QuickStop;
+ABBCW.3  := EnableOp;
+ABBCW.4  := RampOut;
+ABBCW.5  := RampHold;
+ABBCW.6  := RampIn;
+ABBCW.7  := bReset;
+ABBCW.10 := RemoteCmd;
+ABBCW.11 := ExtCntrl;
+
+ReadySwOn       := ABBSW.0;
+SwitchedOn      := ABBSW.1;
+OpEnabled       := ABBSW.2;
+Fault           := ABBSW.3;
+VoltageEnable   := ABBSW.4;
+QuickStopActive := ABBSW.5;
+SwitchOnDisable := ABBSW.6;
+Warning         := ABBSW.7;
+AtSetpoint      := ABBSW.8;
+Remote          := ABBSW.9;
+InternalLimit   := ABBSW.11;
+
+LimitSwitchExt := DriveSW.0;
+LimitSwitchRet := DriveSW.1;
+
+_Extended  := NOT LimitSwitchExt;
+_Retracted := NOT LimitSwitchRet;
+
+IF (ReadySwOn = FALSE OR Fault = 1) AND ABB_State = 3 THEN
+    ABB_State := 0;
+END_IF
+
+//ABB DRIVE COMMUNICATION PROFILE STATE MACHINE
+CASE ABB_State OF
+
+    //CHECK THAT DEVICE IS IN REMOTE
+    0:
+        bReset := 0;
+
+        IF Remote AND Fault = 0 THEN
+            ABB_State := 1;
+        END_IF
+
+        //NOT READY TO SWITCH ON
+    1:
+        SwitchOn      := 0;
+        EnableVoltage := 1;
+        QuickStop     := 1;
+
+        IF ReadySwOn AND SwitchedOn = FALSE THEN
+            ABB_State := 2;
+        END_IF
+
+        //READY TO SWITCH ON
+    2:
+        SwitchOn := 1;
+
+        IF SwitchedOn THEN
+            ABB_State := 3;
+        END_IF
+
+        // OPERATION ENABLED
+    3:
+
+        //SWITCH ON DISABLED
+    5:
+        ;
+
+        //FAULT
+    6:
+        SwitchOn      := 0;
+        bReset        := 1;
+        ABB_State     := 0;
+        EnableVoltage := 0;
+        QuickStop     := 0;
+
+END_CASE
+
+SUPER^.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Extended" Id="{02f5f0f2-8928-4385-a776-11dc0e394622}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Extended : BOOL]]></Declaration>
+      <Get Name="Get" Id="{d02ef4a6-73d2-437c-a7be-45faaa565176}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Extended := _Extended;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Jog" Id="{e7226418-da22-495f-a2d6-eb0c8852efbb}">
+      <Declaration><![CDATA[METHOD Jog : BOOL
+VAR_INPUT
+    JogFW : BOOL := FALSE;
+    JogBW : BOOL := FALSE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF ABB_State = 3 THEN
+    IF JogFW AND LimitSwitchExt THEN //EXTEND UNTIL LIMIT SWITCH
+        EnableOp := 1;
+        RampOut  := 1;
+        RampHold := 1;
+        RampIn   := 1;
+        Vel      := DirPos * AbsVel;
+    ELSIF JogBW AND LimitSwitchRet THEN //RETRACT UNTIL LIMIT SWITCH
+        EnableOp := 1;
+        RampOut  := 1;
+        RampHold := 1;
+        RampIn   := 1;
+        Vel      := DirNeg * AbsVel;
+    ELSIF NOT LimitSwitchExt THEN //DISABLE WHEN POSITIVE LIMIT SWITCH IS TRIGGERED
+        JogFW    := FALSE;
+        EnableOp := 0;
+        RampOut  := 0;
+    ELSIF NOT LimitSwitchRet THEN //DISABLE WHEN NEGATIVE LIMIT SWITCH IS TRIGGERED
+        JogBW    := FALSE;
+        EnableOp := 0;
+        RampOut  := 0;
+    ELSE //DISABLE WHEN SIGNALS TO BOTH LIMIT SWITCHES ARE INTERRUPTED
+        EnableOp := 0;
+        RampOut  := 0;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset" Id="{d85d2409-6fb2-4e6e-9946-6d4dd7385661}">
+      <Declaration><![CDATA[METHOD Reset : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF SUPER^.Reset() THEN
+    IF Fault THEN
+        bReset := TRUE;
+    ELSE
+        Reset  := TRUE;
+        bReset := FALSE;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Retracted" Id="{0a6841a8-e7ab-4e5c-b530-eb509b6dff3d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Retracted : BOOL]]></Declaration>
+      <Get Name="Get" Id="{a8e046d7-0f17-48b4-9d6d-7c4cff3d5619}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Retracted := _Retracted;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Stop" Id="{fdc0464a-a08a-4141-8c95-6fb914473ad9}">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[EnableOp := 0;
+RampOut  := 0;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

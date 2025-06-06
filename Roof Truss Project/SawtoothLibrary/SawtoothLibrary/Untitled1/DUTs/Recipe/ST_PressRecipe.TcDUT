@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_PressRecipe" Id="{0f420baa-155e-4e85-bb9d-298d8d077baa}">
+    <Declaration><![CDATA[TYPE
+    ST_PressRecipe : STRUCT
+        State               : E_RamState;
+        State_Previous      : E_RamState;
+        State_Response      : E_RamState;
+        State_Str           : STRING;
+        State_Previous_Str  : STRING;
+        State_Response_Str  : STRING;
+        PressOnRetract      : BOOL;
+        Pressure            : UINT;
+        SubState            : UINT;
+        OpenPosition        : UINT := 70;
+        BackerPosition      : UINT := 163;
+        ClosedPosition      : UINT := 170;
+        AtTop               : BOOL;
+        AtWork              : BOOL;
+        Axis                : ST_AxisRecipe;
+        TorqueOptions       : SPT_Motion_Control.ST_TorqueControlOptions;
+        TorqueControl       : SPT_Motion_Control.MC_TorqueControl;
+        DriveOpMode_Read    : SPT_Motion_Control.MC_ReadDriveOperationMode;
+        DriveOpMode_Write   : SPT_Motion_Control.MC_ReadDriveOperationMode;
+        DriveOpMode_Options : SPT_Motion_Control.ST_DriveOperationModeOptions;
+        Execute_TorqueMove  : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

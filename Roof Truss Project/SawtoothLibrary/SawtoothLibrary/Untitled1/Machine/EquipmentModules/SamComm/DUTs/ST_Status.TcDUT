@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Status" Id="{bf9b7e54-08af-4141-9bb2-70bc1cb8c15a}">
+    <Declaration><![CDATA[TYPE
+    ST_Status : STRUCT
+        //Plc    : ST_Plc;//Sam doesn't do anything with this at the moment but can in the future
+        Tasks : ARRAY[1..MAX_TASKS] OF ST_TaskStatus; // Array of 10 tasks
+    //Alerts : ARRAY[1..2] OF ST_Alert; // Array of alerts but removing for now because sam doesn't do anything with the infomation provided ATM
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Alert" Id="{878dbf30-551b-4173-9055-6a456c93bffe}">
+    <Declaration><![CDATA[TYPE
+    ST_Alert : STRUCT
+        Level   : STRING[10]; // Adjust size based on expected values (e.g., "WARNING")
+        Message : STRING[50]; // Adjust size based on expected message lengths
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

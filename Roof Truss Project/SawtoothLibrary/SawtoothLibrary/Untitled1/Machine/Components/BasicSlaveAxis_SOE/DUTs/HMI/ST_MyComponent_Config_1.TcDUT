@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MyComponent_Config_1" Id="{d89d8c7d-e826-4b04-8701-15331f22b4d9}">
+    <Declaration><![CDATA[TYPE
+    ST_MyComponent_Config_1 : STRUCT
+        ExtendTime  : LREAL;
+        RetractTime : LREAL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

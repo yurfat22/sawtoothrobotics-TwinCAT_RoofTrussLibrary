@@ -1,0 +1,405 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_IRC5" Id="{796a1544-231c-457c-9019-291baed7406d}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_IRC5 EXTENDS FB_ComponentBase_SR IMPLEMENTS I_IRC5
+
+VAR
+    ControllerIO : ST_IRC5_IO;
+    Pulse        : FB_PulseGenerator;
+    // Inputs
+
+    InputArray AT %I* : ARRAY[0..1] OF USINT;
+
+    // Outputs
+
+    OutputArray AT %Q* : ARRAY[0..1] OF USINT;
+
+    // HMI
+
+    IRC5_HMI : ST_IRC5_HMI;
+
+    // Alarms
+
+    IRC5Alarms : ARRAY[1..IRC5_ALARMS_COUNT] OF FB_TcAlarm;
+
+    _Start_State : INT;
+    _Reset_State : INT;
+END_VAR
+
+VAR CONSTANT
+    IRC5_ALARMS_COUNT : UDINT := 14;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{137ce570-957e-47b0-8fe1-48f0f54d1144}" />
+    <Folder Name="I_CyclicFB" Id="{9a10e407-f610-48b4-b387-c9643b578e4d}" />
+    <Folder Name="I_Template" Id="{e56fe36c-8a67-40d4-869e-544618fc899d}" />
+    <Folder Name="Methods" Id="{70c2c522-3408-461e-89d0-c25cd203599b}" />
+    <Folder Name="Properties" Id="{21718c53-931d-4740-a0bf-f486213578bc}" />
+    <Method Name="Abort" Id="{51e21c25-2256-4510-bbf5-ded8e307ba5d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Abort : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Abort := FALSE;
+
+IF _Simulate THEN
+    Abort := TRUE;
+    RETURN;
+END_IF
+
+IF Stop() THEN
+    ControllerIO.OUT.PPtoMain := Pulse.PulseOutput;
+
+    IF ControllerIO.IN.PP_Moved THEN
+        ControllerIO.OUT.PPtoMain := FALSE;
+        Abort                     := TRUE;
+        Trace('IRC5 Abort Finished ');
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CreateEvents" Id="{5bd5fb70-0025-41ec-9cb9-0221dd302350}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_CreateAllEventsInClass(Alarms     := IRC5Alarms,
+                         ClassSize  := SIZEOF(TC_EVENTS.IRC5),
+                         pInitEvent := ADR(TC_EVENTS.IRC5.InitReferenceEvent),
+                         Prefix     := _Name);
+
+SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{afeb66a4-812a-4705-a394-e48362f8ebe3}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+Pulse.CyclicLogic();
+
+SignalMapping();
+Monitoring(); //Constant error and status monitoring
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := Comp_Alarms, CurrentSeverity := _CurrentAlarmSeverity);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="EStopped" Id="{44857d60-b7e3-4159-a398-0c5225969c35}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY EStopped : BOOL]]></Declaration>
+      <Get Name="Get" Id="{d05f0984-672b-45f0-a964-b11a63023068}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[EStopped := NOT ControllerIO.IN.E_Stop;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="EStopReset" Id="{3429a14c-a6a3-4759-8587-05494f4e0e09}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD EStopReset : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF ControllerIO.IN.AllTasksRunning OR _Simulate THEN
+    EStopReset := TRUE;
+    RETURN;
+END_IF
+
+EStopReset := FALSE;
+
+CASE _Reset_State OF
+    0:
+
+        IF NOT ControllerIO.IN.E_Stop THEN
+            _Reset_State := 2;
+        ELSIF ControllerIO.IN.RunChainOK THEN
+            _Reset_State := 2;
+        END_IF
+
+    1:
+        ControllerIO.OUT.EStopReset := Pulse.PulseOutput;
+
+        IF ControllerIO.IN.E_Stop = TRUE THEN
+            ControllerIO.OUT.EStopReset := FALSE;
+            _Reset_State                := 2;
+        END_IF
+
+    2:
+        EStopReset   := TRUE;
+        _Reset_State := 0;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="InAuto" Id="{74f3133a-ca53-4216-9291-a6e68b1caf77}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY InAuto : BOOL]]></Declaration>
+      <Get Name="Get" Id="{98f3eb3e-5c99-4b71-8d98-bcf1823d3325}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[InAuto := ControllerIO.IN.AutoMode;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Initialize" Id="{a99d76dd-77c2-4adf-be96-6e8a90ad9caf}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{9b251a98-be76-4e1f-9708-7a35a19d32fd}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[///////////////////////////////////////////////////////////////////////////////
+// 5. Auto: ID=5
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.Auto].bRaised) AND (NOT ControllerIO.IN.AutoMode) THEN
+    // Raise alarm if we are NOT in auto
+    IRC5Alarms[E_IRC5.Auto].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.Auto].bRaised AND (ControllerIO.IN.AutoMode) THEN
+    // Clear alarm if we return to auto
+    IRC5Alarms[E_IRC5.Auto].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 6. Estop: ID=6
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.Estop].bRaised) AND (NOT ControllerIO.IN.E_Stop) THEN
+    IRC5Alarms[E_IRC5.Estop].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.Estop].bRaised AND (ControllerIO.IN.E_Stop) THEN
+    IRC5Alarms[E_IRC5.Estop].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 7. MotorSupervision: ID=7
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.MotorSupervision].bRaised) AND (NOT ControllerIO.IN.MotionSupervision) THEN
+    IRC5Alarms[E_IRC5.MotorSupervision].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.MotorSupervision].bRaised AND (ControllerIO.IN.MotionSupervision) THEN
+    IRC5Alarms[E_IRC5.MotorSupervision].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 8. MotorsOn: ID=8
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.MotorsOn].bRaised) AND (ControllerIO.IN.MotorsOn) THEN
+    IRC5Alarms[E_IRC5.MotorsOn].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.MotorsOn].bRaised AND (NOT ControllerIO.IN.MotorsOn) THEN
+    IRC5Alarms[E_IRC5.MotorsOn].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 9. SignalsSimulated: ID=9
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.SignalsSimulated].bRaised) AND (NOT ControllerIO.IN.SignalsSimulated) THEN
+    IRC5Alarms[E_IRC5.SignalsSimulated].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.SignalsSimulated].bRaised AND (ControllerIO.IN.SignalsSimulated) THEN
+    IRC5Alarms[E_IRC5.SignalsSimulated].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 10. AllTasksRunning: ID=10
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.AllTasksRunning].bRaised) AND (ControllerIO.IN.AllTasksRunning) THEN
+    IRC5Alarms[E_IRC5.AllTasksRunning].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.AllTasksRunning].bRaised AND (NOT ControllerIO.IN.AllTasksRunning) THEN
+    IRC5Alarms[E_IRC5.AllTasksRunning].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 11. AllTasksNotRunning: ID=11
+///////////////////////////////////////////////////////////////////////////////
+// Raise if tasks are NOT running, clear if they start running
+IF (NOT IRC5Alarms[E_IRC5.AllTasksNotRunning].bRaised) AND (NOT ControllerIO.IN.AllTasksRunning) THEN
+    IRC5Alarms[E_IRC5.AllTasksNotRunning].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.AllTasksNotRunning].bRaised AND (ControllerIO.IN.AllTasksRunning) THEN
+    IRC5Alarms[E_IRC5.AllTasksNotRunning].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 12. RunChainOK: ID=12
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.RunChainOK].bRaised) AND (ControllerIO.IN.RunChainOK) THEN
+    IRC5Alarms[E_IRC5.RunChainOK].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.RunChainOK].bRaised AND (NOT ControllerIO.IN.RunChainOK) THEN
+    IRC5Alarms[E_IRC5.RunChainOK].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 13. RunChainNotOK: ID=13
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.RunChainNotOK].bRaised) AND (NOT ControllerIO.IN.RunChainOK) THEN
+    IRC5Alarms[E_IRC5.RunChainNotOK].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.RunChainNotOK].bRaised AND (ControllerIO.IN.RunChainOK) THEN
+    IRC5Alarms[E_IRC5.RunChainNotOK].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 14. PP_Moved: ID=14
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT IRC5Alarms[E_IRC5.PP_Moved].bRaised) AND (ControllerIO.IN.PP_Moved) THEN
+    IRC5Alarms[E_IRC5.PP_Moved].Raise(0);
+ELSIF IRC5Alarms[E_IRC5.PP_Moved].bRaised AND (NOT ControllerIO.IN.PP_Moved) THEN
+    IRC5Alarms[E_IRC5.PP_Moved].Clear(0, 0);
+END_IF;
+
+// run the base extended monitoring
+SUPER^.Monitoring();
+
+//////////////////////////////////////////////////////////////////////////
+// Wrap-up: Evaluate overall severity, after the extended Monitoring has ran base monitoring
+//////////////////////////////////////////////////////////////////////////
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := IRC5Alarms, CurrentSeverity := _CurrentAlarmSeverity);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ParentResponseDefinitions" Id="{d55d5fdf-98e9-4604-8932-8628c8a30929}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ParentResponseDefinitions : ARRAY[0..4] OF E_AlarmResponse]]></Declaration>
+      <Get Name="Get" Id="{67dd1f64-50cc-45dd-ac36-6782f1895eb2}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IF _Simulate THEN
+    ParentResponseDefinitions[TcEventSeverity.Verbose]  := E_AlarmResponse.NoResponse;
+    ParentResponseDefinitions[TcEventSeverity.Info]     := E_AlarmResponse.NoResponse;
+    ParentResponseDefinitions[TcEventSeverity.Warning]  := E_AlarmResponse.NoResponse;
+    ParentResponseDefinitions[TcEventSeverity.Error]    := E_AlarmResponse.NoResponse;
+    ParentResponseDefinitions[TcEventSeverity.Critical] := E_AlarmResponse.Suspend_Immediate;
+ELSE
+    ParentResponseDefinitions[TcEventSeverity.Verbose]  := E_AlarmResponse.NoResponse;
+    ParentResponseDefinitions[TcEventSeverity.Info]     := E_AlarmResponse.NoResponse;
+    ParentResponseDefinitions[TcEventSeverity.Warning]  := E_AlarmResponse.Suspend_Controlled;
+    ParentResponseDefinitions[TcEventSeverity.Error]    := E_AlarmResponse.Suspend_Controlled;
+    ParentResponseDefinitions[TcEventSeverity.Critical] := E_AlarmResponse.Suspend_Immediate;
+END_IF]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="SignalMapping" Id="{2a9c3fde-5691-43a9-94d9-4a2bd2293694}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD SignalMapping : bool
+VAR
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[OutputArray[0].0 := ControllerIO.OUT.PPtoMain;
+OutputArray[0].1 := ControllerIO.OUT.Resume;
+OutputArray[0].2 := ControllerIO.OUT.Pause;
+OutputArray[0].3 := ControllerIO.OUT.EStopReset;
+OutputArray[0].4 := ControllerIO.OUT.MotorsOn;
+OutputArray[0].5 := ControllerIO.OUT.MotorsOff;
+
+ControllerIO.IN.AutoMode          := InputArray[0].0;
+ControllerIO.IN.E_Stop            := InputArray[0].1;
+ControllerIO.IN.MotionSupervision := InputArray[0].2;
+ControllerIO.IN.MotorsOn          := InputArray[0].3;
+ControllerIO.IN.RunChainOK        := InputArray[0].4;
+ControllerIO.IN.SignalsSimulated  := InputArray[0].5;
+ControllerIO.IN.AllTasksRunning   := InputArray[0].6;
+ControllerIO.IN.PP_Moved          := InputArray[0].7;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Start" Id="{5f7c1339-344e-429b-816b-bba83deeb24b}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Start : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF ControllerIO.IN.AllTasksRunning OR _Simulate THEN
+    Start := TRUE;
+    RETURN;
+END_IF
+
+Start := FALSE;
+
+CASE _Start_State OF
+    0:
+        IF ControllerIO.IN.AllTasksRunning THEN
+            _Start_State := 7;
+        ELSE
+            _Start_State := 1;
+        END_IF
+
+    1:
+        ControllerIO.OUT.Resume := FALSE;
+        ControllerIO.OUT.Pause  := FALSE;
+
+        IF NOT ControllerIO.IN.E_Stop THEN
+            _Start_State := 2;
+        ELSIF ControllerIO.IN.RunChainOK THEN
+            _Start_State := 3;
+        END_IF
+
+    2:
+        ControllerIO.OUT.EStopReset := Pulse.PulseOutput;
+
+        IF ControllerIO.IN.E_Stop = TRUE THEN
+            ControllerIO.OUT.EStopReset := FALSE;
+            _Start_State                := 1;
+        END_IF
+
+    3:
+        IF ControllerIO.IN.AutoMode THEN
+            _Start_State := 4;
+        END_IF
+
+    4:
+        IF ControllerIO.IN.SignalsSimulated = TRUE THEN
+            _Start_State := 5;
+        END_IF
+
+    5:
+        ControllerIO.OUT.Resume := Pulse.PulseOutput;
+
+        IF ControllerIO.IN.AllTasksRunning THEN
+            ControllerIO.OUT.Resume := FALSE;
+            _Start_State            := 7;
+        ELSIF NOT ControllerIO.IN.RunChainOK THEN
+            ControllerIO.OUT.Resume := FALSE;
+            _Start_State            := 1;
+        END_IF
+
+    7:
+        Start        := TRUE;
+        _Start_State := 0;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stop" Id="{6d6e96f1-aaca-48e5-960c-756eaaa8b250}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Stop : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Stop := FALSE;
+
+ControllerIO.OUT.Pause := ControllerIO.IN.AllTasksRunning;
+
+IF NOT ControllerIO.IN.AllTasksRunning THEN
+    ControllerIO.OUT.Pause := FALSE;
+    Stop                   := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

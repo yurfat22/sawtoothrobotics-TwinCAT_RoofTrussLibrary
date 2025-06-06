@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_Double_Pick_States" Id="{8a7f62b3-e38c-433c-b725-27a522f8f57c}">
+    <Declaration><![CDATA[{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_Double_Pick_States : (
+        DP_REQUEST_WS    := 0,
+        DP_SECURE        := 10,
+        DP_PICK_READY_WS := 20,
+        DP_RETRACT_CLAMP := 30,
+        DP_PICK_DONE_WS  := 40,
+        DP_GEAR_IN_WS    := 50,
+        DP_GEAR_IN       := 60,
+        DP_GEARED_IN_WS  := 70,
+        DP_ERROR         := 999
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

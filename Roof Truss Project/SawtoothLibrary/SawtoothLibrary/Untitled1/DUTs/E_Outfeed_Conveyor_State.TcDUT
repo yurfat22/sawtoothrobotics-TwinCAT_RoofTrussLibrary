@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_Outfeed_Conveyor_State" Id="{28c60a88-268a-4354-ac7f-d745fd748a9d}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_Outfeed_Conveyor_State : (
+        INVALID           := 0,
+        IDLE              := 1,
+        INDEX_PREP        := 2,
+        INDEXING          := 3,
+        INDEX_HALF_PREP   := 4,
+        INDEXING_HALF     := 5,
+        RECEIVE_PREP      := 6,
+        RECEIVING         := 7,
+        OCCUPIED          := 8,
+        RESET             := 9,
+        BUILD_IN_PROGRESS := 10,
+        AUTO_RETRACT      := 20,
+        ERROR             := 999
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

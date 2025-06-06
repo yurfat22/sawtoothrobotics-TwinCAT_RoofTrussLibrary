@@ -1,0 +1,1242 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Carriage" Id="{0ec34e38-c65e-4697-b5d2-b4d585cbc2ec}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Carriage EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    ipSubModules_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_PackML_BaseModule := [];
+
+    // Component definitions here
+
+    // Transporter components based on class diagram
+
+    Pos                 : FB_Component_BasicSlaveAxis_SoE := (Name := 'Position');
+    Pick                : FB_Component_BasicSlaveAxis_SoE := (Name := 'Pick');
+    BoardPresentSensor1 : FB_DigitalSensor                := (Name := 'BoardPresentSensor1');
+    BoardPresentSensor2 : FB_DigitalSensor                := (Name := 'BoardPresentSensor2');
+    HomingSensor        : FB_DigitalSensor                := (Name := 'HomingSensor');
+
+    //Alarms for this module
+
+    Pick_TorqueControl          : SPT_Motion_Control.MC_TorqueControl;
+    Pick_HomingInfo             : ST_HomingParams;
+    Pick_TorqueReference AT %Q* : UINT  := 100;
+    Pick_First_Torque           : LREAL := -30;
+    Pick_Second_Torque          : LREAL := -20;
+    Pick_Home_Torque            : LREAL := 35;
+    Pick_Lag                    : LREAL := 8;
+    Pick_Vel                    : LREAL := 1200;
+
+    MoveStates    : ST_MoveStates;
+    SpeedSelected : E_SpeedOptions := E_SpeedOptions.TESTING1;
+
+    Execute_TorqueMove      : BOOL;
+    _SensorOverride         : BOOL;
+    _SensorIgnore           : BOOL;
+    BoardsIgnoredCount      : USINT;
+    BoardSecured_AfterStop  : BOOL;
+    GrabTorqueNotCompleting : BOOL;
+    ReleaseNotFinished      : BOOL;
+    MoveIdleNotFinished     : BOOL;
+END_VAR
+
+VAR CONSTANT
+    //reports 
+
+    FAULT : INT := 1;
+
+    //Alarms
+
+    UNWIND_ALARM_COUNT    : INT   := 5;
+    CARRIAGE_ALARMS_COUNT : USINT := 10;
+END_VAR
+
+VAR
+	PickMotorCmds_Extra : ST_MotorControls_NonStandard;
+	PosMotorCmds_Extra : ST_MotorControls_NonStandard;
+
+    _TargetPos       : LREAL;
+    _IdlePos         : REAL;
+    _HoldingBoard    : BOOL;
+    _TestPick        : BOOL;
+    _BoardSecured    : BOOL;
+    _BoardDataToPass : ST_BoardData;
+
+    _CarriageCollisionCheckOK    : BOOL;
+    _BoardCollisionCheckOK       : BOOL;
+    _MoveClearActive             : BOOL;
+    _BoardHeight                 : LREAL;
+    _MoveState                   : E_MoveCarriageState;
+    _MoveSubState                : UDINT;
+    CarriageMovementRequestState : UDINT;
+
+    _ClearOfCarriages      : BOOL;
+    _ClearOfBoards         : BOOL;
+    _ActuatorsOpen         : BOOL;
+    _ActuatorsClosed       : BOOL;
+    _MovementRequested     : BOOL;
+    _OpenActuatorsRequest  : BOOL;
+    _CloseActuatorsRequest : BOOL;
+
+    MoveIdleState : USINT;
+
+    HomeHardStop : BOOL;
+
+    //Homing Options
+
+    TorqueOptions : SPT_Motion_Control.ST_TorqueControlOptions;
+
+    _PressPermissions : ST_MediatorInterface;
+
+    _MasterAxisRef : REFERENCE TO SPT_Motion_Control.AXIS_REF;
+    _AxisRef       : REFERENCE TO SPT_Motion_Control.AXIS_REF;
+
+    Grab_State    : E_GrabState;
+    Release_State : E_ReleaseState;
+
+    LastBoardHeightGrabbed : LREAL := 100;
+    ;
+
+    CarriageAlarms : ARRAY[1..CARRIAGE_ALARMS_COUNT] OF FB_TcAlarm;
+	
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{1b41f637-0c98-40be-b752-84a408197c7f}" />
+    <Folder Name="Methods" Id="{95b7f340-5359-4742-a52e-0f3be0113d16}">
+      <Folder Name="ActingStates" Id="{16584e04-2acb-4049-a7a5-5e0cd8425256}" />
+      <Folder Name="WaitingStates" Id="{8508d379-2a68-4406-bb49-72542e3bb3c1}" />
+    </Folder>
+    <Folder Name="NewFolder1" Id="{f93f8aa3-eef0-47ff-8ec6-43e78ecdf165}" />
+    <Folder Name="Properties" Id="{cee3d819-5b22-4d49-a243-26e3eb401e57}" />
+    <Property Name="ActuatorsClosed" Id="{7cc782d9-4af1-4eea-8487-267a72a81e84}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ActuatorsClosed : bool]]></Declaration>
+      <Set Name="Set" Id="{6c38ad31-68ee-4b0f-8b3c-31e6dfdf4940}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ActuatorsClosed := ActuatorsClosed;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="ActuatorsOpen" Id="{62c41805-1df1-47aa-add6-bc2caef8d879}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ActuatorsOpen : bool]]></Declaration>
+      <Set Name="Set" Id="{7eed0086-28e6-4e7d-8568-edab69b564a6}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ActuatorsOpen := ActuatorsOpen;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="AxisRef" Id="{40bab38e-da16-4d9a-9ee5-98d14f8b2abd}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY AxisRef : REFERENCE TO SPT_Motion_Control.AXIS_REF;]]></Declaration>
+      <Get Name="Get" Id="{79cf6183-885e-4ebe-b660-4f07e64d04d9}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[AxisRef REF= Pos.Axis;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="BoardHeight" Id="{20b68560-1dbf-479e-81b5-52e244b65626}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY BoardHeight : lreal]]></Declaration>
+      <Set Name="Set" Id="{e69dda6c-ef3d-4fa3-be8d-46350b9dce3a}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_BoardHeight := BoardHeight;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="BoardSecured" Id="{9f04dc18-aced-441d-a8b4-2f46de97f219}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY BoardSecured : BOOL]]></Declaration>
+      <Get Name="Get" Id="{e7462268-7e89-4d5d-94ec-c1cedab875fd}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[BoardSecured := _BoardSecured;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{671383ff-9553-446d-9516-f319007d3931}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="ClearOfBoards" Id="{74d69c4f-c3b9-4246-b23e-a907c679f48e}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ClearOfBoards : bool]]></Declaration>
+      <Get Name="Get" Id="{a8772dc7-04d5-4899-89fc-fa674fcee041}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ClearOfBoards := _ClearOfBoards;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{05d09998-6990-4fe5-bcac-a0d5f8ead26c}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ClearOfBoards := ClearOfBoards;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="ClearOfCarriages" Id="{fff980d2-70af-4941-97f8-b244656be14d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ClearOfCarriages : bool]]></Declaration>
+      <Get Name="Get" Id="{4c0b0c39-92c3-42e3-958e-4a549763d13e}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ClearOfCarriages := _ClearOfCarriages;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{66e19386-87dd-4162-8703-8d29f94e3685}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ClearOfCarriages := ClearOfCarriages;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="CloseActuatorsRequest" Id="{6bf01831-6d66-4141-a6cd-6f3d621d66d6}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY CloseActuatorsRequest : bool]]></Declaration>
+      <Get Name="Get" Id="{a46e045e-e1de-48ac-bdda-be7818701f18}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[CloseActuatorsRequest := _CloseActuatorsRequest;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="CreateEvents" Id="{d2121a3d-a5fb-49b8-a02d-d5933ee25aaa}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_CreateAllEventsInClass(Alarms     := CarriageAlarms,
+                         ClassSize  := SIZEOF(TC_EVENTS.Carriage),
+                         pInitEvent := ADR(TC_EVENTS.Carriage.InitReferenceEvent),
+                         Prefix     := _Name);
+
+SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{03fa9127-5c5d-4868-97d9-9b7ec253f0a0}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+SUPER^.CyclicLogic();
+
+//HMI control for EM
+
+fbControlSourceHMI.CyclicLogic();
+
+//Set the current alarm severity for this module
+
+// _CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms:=UnwindAlarms, CurrentSeverity:=_CurrentAlarmSeverity);
+
+IF _CurrentAlarmSeverity >= TcEventSeverity.Error THEN
+    ChangeState(E_PMLCommand.ePMLCommand_Abort);
+END_IF
+
+IF _CurrentState <> E_PMLState.ePMLState_Unsuspending AND _CurrentState <> E_PMLState.ePMLState_Unholding THEN
+    BoardSecured_AfterStop := FALSE;
+END_IF
+
+CyclicLogicSimulation();
+
+BoardPresentSensor1.SimulationMode := E_SensorSimulationMode.InputDriven;
+BoardPresentSensor2.SimulationMode := E_SensorSimulationMode.InputDriven;
+
+BoardPresentSensor1.SimulationInput := TRUE;
+BoardPresentSensor2.SimulationInput := TRUE;
+
+Pos.Master1      REF= _MasterAxisRef;
+Pos.RatioMaster1 := 1;
+
+Pick_HomingInfo.HomePosMax := 284;
+Pick_HomingInfo.HomePosMin := 84;
+
+AllowHMIControl(ThisModuleOnly := FALSE);
+
+IF testbool1 THEN
+    IF TorqueHoming(Motor      := Pick,
+                    HomingInfo := Pick_HomingInfo,
+                    Velocity   := 100,
+                    Torque     := 35,
+                    Direction  := SPT_Motion_Control.MC_Direction.MC_Positive_Direction) THEN
+        testbool1 := FALSE;
+    END_IF
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GrabBoard" Id="{e43a172f-6a0e-47f8-ab71-4bff08f5af05}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD GrabBoard : BOOL
+VAR_INPUT
+    BoardHeight : LREAL;
+    SkipMoveAbs : BOOL := FALSE;
+END_VAR
+
+VAR
+    result : USINT;
+END_VAR
+
+VAR_INST
+    Previous_State : E_GrabState;
+    AlarmTON       : TON;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[GrabBoard := FALSE;
+
+CASE Grab_State OF
+    GRAB_START:
+        MoveStates.Release := 0;
+        _HoldingBoard      := TRUE;
+        //Move to Initial Height
+
+        Execute_TorqueMove := FALSE;
+        _BoardSecured      := FALSE;
+
+        IF SkipMoveAbs = FALSE OR _InSimulation THEN
+            Pick.MoveAbsolute(BoardHeight + 25, TRUE);
+            Grab_State := GRAB_MOVE_CHECK;
+        ELSE
+            Grab_State := GRAB_TORQUE;
+        END_IF
+
+        LastBoardHeightGrabbed := BoardHeight;
+        AlarmTON(IN := FALSE, PT := T#5S);
+
+    GRAB_MOVE_CHECK:
+        IF Pick.InPosition AND NOT Pick.Busy THEN
+            IF _TestPick OR _InSimulation THEN
+                Grab_State := GRAB_FINISHED;
+            ELSE
+                Grab_State := GRAB_TORQUE;
+            END_IF
+        ELSIF Pick.Error THEN
+            Grab_State := GRAB_ERROR;
+        END_IF
+
+    GRAB_TORQUE:
+        TorqueOptions.EnableManualTorqueStartValue := TRUE;
+        TorqueOptions.ManualTorqueStartValue       := Pick.Axis.NcToPlc.ActTorque;
+
+        Pick_TorqueControl.Torque := Pick_First_Torque;
+        Execute_TorqueMove        := TRUE;
+
+        Trace('Pick Motor Torque Command High');
+
+        IF ABS(Pick.Axis.NcToPlc.ActTorque - Pick_TorqueControl.Torque) < 0.5 AND Pick.Axis.NcToPlc.ActVelo < 0.2 THEN
+            Grab_State         := GRAB_VERIFY;
+            Execute_TorqueMove := FALSE;
+        ELSIF Pick.Error THEN
+            Grab_State := GRAB_ERROR;
+        END_IF
+
+        AlarmTON(IN := TRUE, PT := T#10S);
+        GrabTorqueNotCompleting := AlarmTON.Q;
+
+    GRAB_VERIFY:
+        IF (BoardPresentSensor1.Active AND BoardPresentSensor2.Active) OR _SensorOverride OR _SensorIgnore OR SkipMoveAbs THEN
+            Grab_State := GRAB_FINISHED;
+        ELSE
+            Grab_State := GRAB_ERROR;
+        END_IF
+
+    GRAB_ERROR:
+		Pick.Disable();
+        result := RaiseMessageBox(Header   := 'Wrong or missing board detected',
+                                  Message1 := 'Carriage tried to stab board and one or both sensors are not being made',
+                                  Message2 := 'Select Retry to try grabbing the board again',
+                                  Message3 := 'Select Override to ignore sensor for this board',
+                                  Message4 := 'Select Ignore to ignore sensors on pick for the next 10 boards',
+                                  Btn1     := 'Retry',
+                                  Btn3     := 'Override',
+                                  Btn5     := 'Ignore');
+
+        IF result = 1 THEN
+            Grab_State := GRAB_RESUME_START;
+        ELSIF result = 3 THEN
+            _SensorOverride := TRUE;
+            Grab_State      := GRAB_RESUME_START;
+        ELSIF result = 5 THEN
+            _SensorIgnore      := TRUE;
+            BoardsIgnoredCount := 0;
+            Grab_State         := GRAB_RESUME_START;
+        END_IF
+
+    GRAB_RESUME_START:
+        IF _CurrentState = E_PMLState.ePMLState_Suspended THEN
+            ChangeState(State := E_PMLCommand.ePMLCommand_Unsuspend);
+        ELSIF _CurrentState = E_PMLState.ePMLState_Execute THEN
+            Grab_State := GRAB_START;
+        END_IF
+
+    GRAB_FINISHED:
+
+        _BoardSecured := TRUE;
+        GrabBoard     := TRUE;
+        Grab_State    := GRAB_START;
+END_CASE
+
+Pick_TorqueControl(Axis              := Pick.Axis,
+                   Execute           := Execute_TorqueMove,
+                   TorqueRamp        := 50,
+                   VelocityLimitHigh := Pick_Vel,
+                   VelocityLimitLow  := -Pick_Vel,
+                   Options           := TorqueOptions);
+
+IF Grab_State <> Previous_State THEN
+    Trace(CONCAT('Carriage grab state change to: ', TO_STRING(Grab_State)));
+END_IF
+
+Previous_State := Grab_State;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{a257f0a3-a8bf-4a95-865f-796b6730fb52}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    HomeCommand_Pick     : BOOL;
+    PowerOnCommand_Pick  : BOOL;
+    PowerOffCommand_Pick : BOOL;
+    PowerOnCommand_Pos   : BOOL;
+    PowerOffCommand_Pos  : BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[PickMotorCmds_Extra.Temp_R_Trig[1](CLK := PickMotorCmds_Extra.MotorCmd[1]);
+
+PowerOnCommand_Pick := PickMotorCmds_Extra.Temp_R_Trig[1].Q AND PowerOnCommand_Pick = FALSE;
+
+IF PowerOnCommand_Pick THEN
+    IF Pick.Enable() THEN
+        PowerOnCommand_Pick := FALSE;
+    END_IF
+END_IF
+
+PickMotorCmds_Extra.Temp_R_Trig[2](CLK := PickMotorCmds_Extra.MotorCmd[2]);
+
+PowerOffCommand_Pick := PickMotorCmds_Extra.Temp_R_Trig[2].Q AND PowerOffCommand_Pick = FALSE;
+
+IF PowerOffCommand_Pick THEN
+    IF Pick.Disable() THEN
+        PowerOffCommand_Pick := FALSE;
+    END_IF
+END_IF
+
+PickMotorCmds_Extra.Temp_R_Trig[3](CLK := PickMotorCmds_Extra.MotorCmd[3]);
+
+HomeCommand_Pick := PickMotorCmds_Extra.Temp_R_Trig[3].Q AND HomeCommand_Pick = FALSE;
+
+IF HomeCommand_Pick THEN
+    IF TorqueHoming(Motor      := Pick,
+                    HomingInfo := Pick_HomingInfo,
+                    Velocity   := 100,
+                    Torque     := 35,
+                    Direction  := SPT_Motion_Control.MC_Direction.MC_Positive_Direction) THEN
+        HomeCommand_Pick := FALSE;
+    END_IF
+
+END_IF
+
+
+
+PosMotorCmds_Extra.Temp_R_Trig[1](CLK := PosMotorCmds_Extra.MotorCmd[1]);
+
+PowerOnCommand_Pos := PosMotorCmds_Extra.Temp_R_Trig[1].Q AND PowerOnCommand_Pos = FALSE;
+
+IF PowerOnCommand_Pos THEN
+    IF Pos.Enable() THEN
+        PowerOnCommand_Pos := FALSE;
+    END_IF
+END_IF
+
+PosMotorCmds_Extra.Temp_R_Trig[2](CLK := PosMotorCmds_Extra.MotorCmd[2]);
+
+PowerOnCommand_Pos := PosMotorCmds_Extra.Temp_R_Trig[2].Q AND PowerOnCommand_Pos = FALSE;
+
+IF PowerOnCommand_Pos THEN
+    IF Pos.Disable() THEN
+        PowerOnCommand_Pos := FALSE;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="HoldingBoard" Id="{2f8e8c03-3907-46d5-8b4d-73be04e4c76f}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY HoldingBoard : Bool]]></Declaration>
+      <Get Name="Get" Id="{a3b4d2fc-9669-41bd-a534-2eb406df4f70}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[HoldingBoard := _HoldingBoard;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="IdlePos" Id="{8634104b-5f32-449d-a071-464ce13c1044}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY IdlePos : REAL]]></Declaration>
+      <Get Name="Get" Id="{9b6fc2b7-def7-4f4a-95bf-c13174f08d02}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IdlePos := _IdlePos;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{763e3f13-f07e-422b-bfc9-f9e073b67f5a}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_IdlePos := IdlePos;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="IgnoreSensors" Id="{d873aa9f-5418-4860-a905-aa954f5aed23}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY IgnoreSensors : BOOL]]></Declaration>
+      <Get Name="Get" Id="{f05a7a00-a2e9-4a69-baa2-840e48ccfb76}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[IgnoreSensors := _SensorIgnore;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{8ba269d5-e2a1-4ca1-be26-e8cd2d452b31}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SensorIgnore := IgnoreSensors;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Initialize" Id="{8697013a-2a18-4380-b626-87376ad278b8}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(Pos);
+        RegisterComponent(Pick);
+        RegisterComponent(BoardPresentSensor1);
+        RegisterComponent(BoardPresentSensor2);
+        RegisterComponent(HomingSensor);
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MasterAxis" Id="{9d367daf-b160-491a-a85b-f2d3e6f8c7d5}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MasterAxis : REFERENCE TO SPT_Motion_Control.AXIS_REF;]]></Declaration>
+      <Set Name="Set" Id="{fec76a5f-489d-43d7-a083-c74c9e425f94}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MasterAxisRef REF= MasterAxis;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Monitoring" Id="{4876539b-41a6-417d-8cac-a79b16478d7c}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[///////////////////////////////////////////////////////////////////////////////
+// 5.-12. Suspend warnings
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT CarriageAlarms[E_Carriage.GrabTorqueNotFinished].bRaised) AND GrabTorqueNotCompleting THEN
+    // Raise alarm if Infeed is taking a long time to get a board
+    CarriageAlarms[E_Carriage.GrabTorqueNotFinished].Raise(0);
+ELSIF CarriageAlarms[E_Carriage.GrabTorqueNotFinished].bRaised AND (NOT GrabTorqueNotCompleting) THEN
+    // Clear when a board is found
+    CarriageAlarms[E_Carriage.GrabTorqueNotFinished].Clear(0, 0);
+END_IF;
+
+IF (NOT CarriageAlarms[E_Carriage.GrabTorqueNotFinished].bRaised) AND ReleaseNotFinished THEN
+    // Raise alarm if Infeed is taking a long time to get a board
+    CarriageAlarms[E_Carriage.GrabTorqueNotFinished].Raise(0);
+ELSIF CarriageAlarms[E_Carriage.GrabTorqueNotFinished].bRaised AND (NOT ReleaseNotFinished) THEN
+    // Clear when a board is found
+    CarriageAlarms[E_Carriage.GrabTorqueNotFinished].Clear(0, 0);
+END_IF;
+
+IF (NOT CarriageAlarms[E_Carriage.MoveIdleNotFinished].bRaised) AND MoveIdleNotFinished THEN
+    // Raise alarm if Infeed is taking a long time to get a board
+    CarriageAlarms[E_Carriage.MoveIdleNotFinished].Raise(0);
+ELSIF CarriageAlarms[E_Carriage.MoveIdleNotFinished].bRaised AND (NOT MoveIdleNotFinished) THEN
+    // Clear when a board is found
+    CarriageAlarms[E_Carriage.MoveIdleNotFinished].Clear(0, 0);
+END_IF;
+
+//////////////////////////////////////////////////////////////////////////
+// Wrap-up: Evaluate overall severity, then run the extended Monitoring
+//////////////////////////////////////////////////////////////////////////
+_CurrentAlarmSeverity := TcEventSeverity.Verbose;
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := CarriageAlarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+// Finally, run the extended monitoring
+// SUPER^.Monitoring();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MotorsInit" Id="{1cc31649-0de5-4f1b-a8da-8e1f5b6774be}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD MotorsInit : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MotorsInit := FALSE;
+
+IF _InSimulation THEN
+    IF MotorResetAndEnable(Pos) AND MotorResetAndEnable(Pick) THEN
+        MotorsInit := TRUE;
+    END_IF
+ELSE
+    IF MotorResetAndEnable(Pos) AND MotorResetAndEnable(Pick) THEN
+        MotorsInit := TRUE;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MoveClearActive" Id="{fd1210e7-c110-45b3-8cad-dbeb4e56f46d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MoveClearActive : BOOL]]></Declaration>
+      <Get Name="Get" Id="{a96a595b-2614-4e70-b667-c76fc5e666d3}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MoveClearActive := _MoveClearActive;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{53e1cf5b-232e-4617-88f9-5b30dc5d5257}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MoveClearActive := MoveClearActive;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="MoveIdleOnStarting" Id="{c12531f5-433e-49f0-9594-06504005cd67}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD MoveIdleOnStarting : BOOL
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    AlarmTON : TON;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MoveIdleOnStarting := FALSE;
+
+CASE MoveIdleState OF
+    0:
+        _HoldingBoard := FALSE;
+        //check to see if pick is retracted
+
+        //TODO limit switch for carriage retract instead of position check
+
+        IF ReleaseBoard() THEN
+            MoveIdleState := 10;
+        END_IF
+
+        AlarmTON(IN := FALSE, PT := T#10S);
+
+    10:
+        // Move to Position
+
+        Pos.MoveAbsolute(Position := _IdlePos, AbortPrevious := TRUE);
+        MoveIdleState := 11;
+
+    11:
+        // verify position
+
+        AlarmTON(IN := FALSE, PT := T#10S);
+
+        IF Pos.Busy THEN
+            MoveIdleState := 20;
+        END_IF
+
+        MoveIdleNotFinished := AlarmTON.Q;
+
+    20:
+        MoveStates.Idle    := 0;
+        MoveIdleOnStarting := TRUE;
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MovementRequested" Id="{6692353d-760f-4ff8-a39f-41bec22f0c31}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MovementRequested : bool]]></Declaration>
+      <Get Name="Get" Id="{05b3bc75-4948-4704-a64f-626ee1bb827b}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MovementRequested := _MovementRequested;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="MoveState" Id="{3f440c23-a1f3-45ff-9d08-69802c7eb41d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MoveState : E_MoveCarriageState;]]></Declaration>
+      <Get Name="Get" Id="{a67fa3b8-d730-4976-a37d-40fe621dcc63}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MoveState := _MoveState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{b575ba7c-b348-4a83-a85d-3878582f7f3c}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MoveState := MoveState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="MoveSubState" Id="{fce216fd-6c7f-4467-abbf-598f5f0999e8}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MoveSubState : udint]]></Declaration>
+      <Get Name="Get" Id="{51e3e5cf-1f28-4197-a479-272b00744e4c}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MoveSubState := _MoveSubState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{7b15573b-f38b-4ab9-b07e-260f93a26d70}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MoveSubState := MoveSubState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="OpenActuatorsRequest" Id="{4cfadd74-7b64-4a77-8f25-72f34d5cc179}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OpenActuatorsRequest : bool]]></Declaration>
+      <Get Name="Get" Id="{87814cd3-bf5c-4dc9-ae2d-4ef1f0fc9918}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[OpenActuatorsRequest := _OpenActuatorsRequest;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="OverrideSensors" Id="{61a02d66-ec04-4479-820a-d83629e23a57}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OverrideSensors : BOOL]]></Declaration>
+      <Get Name="Get" Id="{6b4df0b7-979e-4e67-a90e-0d25fce67a86}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[OverrideSensors := _SensorOverride;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{cda9a40d-4e3c-4397-85d9-c26c6da280c8}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SensorOverride := OverrideSensors;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="PressPermissions" Id="{5a1e8be3-3389-48f3-8e8f-5c781be38ba8}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PressPermissions : REFERENCE TO ST_MediatorInterface]]></Declaration>
+      <Get Name="Get" Id="{94626170-7a07-4609-86da-2c5336de03b1}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[PressPermissions REF= _PressPermissions;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{3d1941ea-4bc9-4604-b044-65793f0bcb5f}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_PressPermissions := PressPermissions;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="ReleaseBoard" Id="{cde7b49b-b777-4af6-b979-2fc1100ba442}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ReleaseBoard : BOOL
+VAR_INPUT
+    Prep        : BOOL  := FALSE;
+    PrepPickPos : LREAL := 0;
+END_VAR
+
+VAR_INST
+    Previous_State : E_ReleaseState;
+    AlarmTON       : TON;
+    PreviousPos    : LREAL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ReleaseBoard := FALSE;
+
+CASE Release_State OF
+    RELEASE_START:
+        MoveStates.Grab := 0;
+        _BoardSecured   := FALSE;
+        //Move to Initial Height
+
+        IF Pick.ActualPosition > 270 THEN
+            Release_State := RELEASE_FINISHED;
+        ELSE
+            Release_State := RELEASE_MOVE;
+        END_IF
+
+        AlarmTON(IN := FALSE, PT := T#5S);
+
+    RELEASE_MOVE:
+        PreviousPos := Pick.ActualPosition;
+
+        Pick.MoveAbsolute(275, TRUE);
+        Release_State := RELEASE_MOVE_CHECK;
+
+    RELEASE_MOVE_CHECK:
+        AlarmTON(IN := TRUE, PT := T#5S);
+
+        IF (Pick.InPosition AND NOT Pick.Busy) OR (Prep = TRUE AND Pick.Busy AND ABS(PreviousPos - Pick.ActualPosition) > 25) THEN
+            Release_State   := RELEASE_FINISHED;
+            _SensorOverride := FALSE;
+            AlarmTON(IN := FALSE, PT := T#5S);
+
+            IF _SensorIgnore = TRUE AND BoardsIgnoredCount > 10 THEN
+                _SensorIgnore := FALSE;
+            ELSE
+                BoardsIgnoredCount := BoardsIgnoredCount + 1;
+            END_IF
+        END_IF
+
+        ReleaseNotFinished := AlarmTON.Q;
+
+    RELEASE_FINISHED:
+        _HoldingBoard := FALSE;
+        ReleaseBoard  := TRUE;
+        Release_State := RELEASE_START;
+END_CASE
+
+IF Release_State <> Previous_State THEN
+    Trace(CONCAT('Carriage release state change to: ', TO_STRING(Release_State)));
+END_IF
+
+Previous_State := Release_State;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Request_WS" Id="{a0359dfb-9009-4627-8a8e-1a65673eacb8}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Request_WS : E_WaitSync]]></Declaration>
+      <Set Name="Set" Id="{62dcca16-9893-4b64-a590-8bd9a66ada10}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_RequestedWaitSync := Request_WS;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Response_WS" Id="{05c6c4c0-a9d5-4d55-b0a9-23d9ca0e3291}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Response_WS : E_WaitSync]]></Declaration>
+      <Get Name="Get" Id="{c9d4db2a-294d-4d1d-835a-b93dc3967354}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Response_WS := _ResponseWaitSync;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="SetSpeeds" Id="{c363ac53-80f1-4c34-b0c8-d808790f3e40}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD SetSpeeds : BOOL
+VAR_INPUT
+	PosVel : LREAL;
+	PickVel : LREAL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Pos.Velocity  := PosVel;
+Pick.Velocity := PickVel;
+
+Pick.Acceleration := Pick.Velocity * 8;
+Pick.Deceleration := Pick.Velocity * 8;
+Pos.Acceleration  := Pos.Velocity * 1.4;
+Pos.Deceleration  := Pos.Velocity * 1.4;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Starting" Id="{a5708e13-32be-476a-af49-620a8a268b05}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Starting</b> state*)
+METHOD PROTECTED Starting
+
+VAR
+    AllDone : bool;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE DescendantSequenceState OF
+    0:
+        IF MotorsInit() THEN
+            DescendantSequenceState     := 10;
+            MoveIdleState               := 0;
+            Pick_HomingInfo.HomingState := 0;
+        END_IF
+
+    10:
+        IF NOT _InSimulation THEN
+            IF TorqueHoming(Motor      := Pick,
+                            HomingInfo := Pick_HomingInfo,
+                            Velocity   := 100,
+                            Torque     := 35,
+                            Direction  := SPT_Motion_Control.MC_Direction.MC_Positive_Direction) THEN
+                DescendantSequenceState := 20;
+            END_IF
+        ELSE
+            DescendantSequenceState := 20;
+        END_IF
+
+    20:
+//         IF MoveIdleOnStarting() THEN
+//             DescendantSequenceState := 30;
+//         END_IF
+// 
+//     30:
+
+        MoveStates.Grab    := 0;
+        MoveStates.Release := 0;
+        SUPER^.Starting();
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="TargetPos" Id="{b7e43306-3900-4269-b665-ec37e0513fab}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY TargetPos : LREAL]]></Declaration>
+      <Get Name="Get" Id="{e0370388-6145-49bd-9650-3f6d246dfb65}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[TargetPos := _TargetPos;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{7ca5f5f5-f2fd-4119-a440-883d212632e3}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_TargetPos := TargetPos;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="TestLengthPosCompare" Id="{69eb1959-1487-4a71-9198-0bf70f03cb83}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD TestLengthPosCompare : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TestLengthPosCompare := FALSE;
+IF Pos.ActualPosition > (BEPoint_Backup.Infeed-38.1 + (60* 25.4)) THEN
+    TestLengthPosCompare := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unholding" Id="{bf8f93eb-fc7f-4e65-a9a7-043826cb512c}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Unholding</b> state
+METHOD PROTECTED Unholding
+VAR
+    i               : UDINT;
+    SubModulesReady : BOOL := TRUE;
+END_VAR
+
+(*! <description><b></b><table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> Held </td>
+		<td> Unhold Command </td> 
+		<td> State Complete </td>
+		<td> Execute </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _ForceHold = FALSE THEN
+    CASE _MotorInitState OF
+        0:
+            IF _ComponentsReset = FALSE THEN
+                _ComponentsReset := ResetOnResume();
+            ELSE
+                _MotorInitState := 1;
+            END_IF
+
+        1:
+            IF _MotorsHomed = FALSE THEN
+                _MotorsHomed := MotorsHome();
+            ELSE
+                _MotorInitState := 2;
+            END_IF
+
+        2:
+            IF _MotorsReset = FALSE THEN
+                _MotorsReset := MotorsInit();
+            ELSE
+                _MotorInitState := 3;
+
+            END_IF
+
+        3:
+            IF _AlignNeeded THEN
+                IF MotorsInitAlignGearIn() THEN
+                    _MotorInitState := 4;
+                END_IF
+            ELSE
+                _MotorInitState := 4;
+            END_IF
+
+            Grab_State    := 0;
+            Release_State := 0;
+
+        4:
+            IF _HoldingBoard THEN
+                IF GrabBoard(LastBoardHeightGrabbed, SkipMoveAbs := TRUE) THEN
+                    _MotorInitState := 5;
+                END_IF
+
+            ELSE
+                IF ReleaseBoard() THEN
+                    _MotorInitState := 5;
+                END_IF
+            END_IF
+
+        5:
+            FOR i := 1 TO NumberOfSubModules DO
+                IF ipSubModules[i].CurrentState = E_PMLState.ePMLState_Held THEN
+                    ipSubModules[i].StateCommand := ePMLCommand_Unhold;
+                ELSIF ipSubModules[i].CurrentState = E_PMLState.ePMLState_Suspended THEN
+                    ipSubModules[i].StateCommand := ePMLCommand_Unsuspend;
+                END_IF
+            END_FOR
+
+            FOR i := 1 TO NumberOfSubModules DO
+                SubModulesReady := SubModulesReady AND (ipSubModules[i].CurrentState = ePMLState_Execute);
+            END_FOR
+
+            IF SubModulesReady AND (StateTasksComplete OR NoStateTasksToComplete) THEN
+                NoStateTasksToComplete := TRUE;
+                StateTasksComplete     := FALSE;
+                StateComplete();
+            END_IF
+    END_CASE
+ELSE
+    FOR i := 1 TO NumberOfSubModules DO
+        IF ipSubModules[i].CurrentState = E_PMLState.ePMLState_Held THEN
+            ipSubModules[i].StateCommand := ePMLCommand_Unhold;
+        ELSIF ipSubModules[i].CurrentState = E_PMLState.ePMLState_Suspended THEN
+            ipSubModules[i].StateCommand := ePMLCommand_Unsuspend;
+        END_IF
+    END_FOR
+
+    FOR i := 1 TO NumberOfSubModules DO
+        SubModulesReady := SubModulesReady AND (ipSubModules[i].CurrentState = ePMLState_Execute);
+    END_FOR
+
+    IF SubModulesReady AND (StateTasksComplete OR NoStateTasksToComplete) THEN
+        NoStateTasksToComplete := TRUE;
+        StateTasksComplete     := FALSE;
+        StateComplete();
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unsuspending" Id="{7a97622a-d973-4c06-af44-d57b38a89ff4}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Unsuspending</b> state
+METHOD PROTECTED Unsuspending
+VAR
+    i               : UDINT;
+    SubModulesReady : BOOL := TRUE;
+END_VAR
+
+(*! <description><b></b><table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> Suspended </td>
+		<td> Unsuspend Command </td> 
+		<td> State Complete </td>
+		<td> Execute </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _ForceHold = FALSE THEN
+    CASE _MotorInitState OF
+        0:
+            IF _ComponentsReset = FALSE THEN
+                _ComponentsReset := ResetOnResume();
+            ELSE
+                _MotorInitState := 1;
+            END_IF
+
+        1:
+            IF _MotorsHomed = FALSE THEN
+                _MotorsHomed := MotorsHome();
+            ELSE
+                _MotorInitState := 2;
+            END_IF
+
+        2:
+            IF _MotorsReset = FALSE THEN
+                _MotorsReset := MotorsInit();
+            ELSE
+                _MotorInitState := 3;
+
+            END_IF
+
+        3:
+            IF _AlignNeeded THEN
+                IF MotorsInitAlignGearIn() THEN
+                    _MotorInitState := 4;
+                END_IF
+            ELSE
+                _MotorInitState := 4;
+            END_IF
+
+            Grab_State    := 0;
+            Release_State := 0;
+
+        4:
+            IF _HoldingBoard THEN
+                IF GrabBoard(LastBoardHeightGrabbed, SkipMoveAbs := TRUE) THEN
+                    _MotorInitState := 5;
+                END_IF
+
+            ELSE
+                IF ReleaseBoard() THEN
+                    _MotorInitState := 5;
+                END_IF
+            END_IF
+
+        5:
+            FOR i := 1 TO NumberOfSubModules DO
+                ipSubModules[i].StateCommand := ePMLCommand_Unsuspend;
+            END_FOR
+
+            FOR i := 1 TO NumberOfSubModules DO
+                SubModulesReady := SubModulesReady AND (ipSubModules[i].CurrentState = ePMLState_Execute);
+            END_FOR
+
+            IF SubModulesReady AND (StateTasksComplete OR NoStateTasksToComplete) THEN
+                NoStateTasksToComplete := TRUE;
+                StateTasksComplete     := FALSE;
+                StateComplete();
+            END_IF
+    END_CASE
+ELSE
+    FOR i := 1 TO NumberOfSubModules DO
+        ipSubModules[i].StateCommand := ePMLCommand_Unsuspend;
+    END_FOR
+
+    FOR i := 1 TO NumberOfSubModules DO
+        SubModulesReady := SubModulesReady AND (ipSubModules[i].CurrentState = ePMLState_Execute);
+    END_FOR
+
+    IF SubModulesReady AND (StateTasksComplete OR NoStateTasksToComplete) THEN
+        NoStateTasksToComplete := TRUE;
+        StateTasksComplete     := FALSE;
+        StateComplete();
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ZPrepMove" Id="{1e06c9bc-0175-47c8-a768-b53ed1d8ae49}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ZPrepMove : BOOL
+VAR_INPUT
+	PrepPos : LREAL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ZPrepMove := FALSE;
+Pick.MoveAbsolute(PrepPos, TRUE);
+
+IF Pick.Busy THEN
+    ZPrepMove := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

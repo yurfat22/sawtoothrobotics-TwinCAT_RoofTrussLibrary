@@ -1,0 +1,890 @@
+<?xml version="1.0"?>
+<TcModuleClass>
+	<Translations>
+		<Text TxtId="AMDTruss"/>
+		<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+			<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+			<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+		</Text>
+		<Text TxtId="DT_AMDTruss_Event_Overload">
+			<Text LcId="1033"><![CDATA[{0} - System overload detected]]></Text>
+			<Text LcId="2058"><![CDATA[Systema sobrecargado detectada]]></Text>
+		</Text>
+		<Text TxtId="DT_AMDTruss_Event_MotorFailure">
+			<Text LcId="1033"><![CDATA[{0} - Motor failure detected]]></Text>
+		</Text>
+		<Text TxtId="DT_AMDTruss_Event_SensorFault">
+			<Text LcId="1033"><![CDATA[{0} - Sensor fault detected]]></Text>
+		</Text>
+		<Text TxtId="DT_AMDTruss_Event_EmergencyStop">
+			<Text LcId="1033"><![CDATA[{0} - Emergency stop engaged]]></Text>
+		</Text>
+		<Text TxtId="DT_AMDTruss_Event_LowAir">
+			<Text LcId="1033"><![CDATA[{0} - Low air pressure detected]]></Text>
+		</Text>
+		<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+			<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+		</Text>
+		<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+			<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+		</Text>
+		<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+			<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+		</Text>
+	</Translations>
+	<DataTypes>
+		<DataType>
+			<Name GUID="{6CA67BE0-354C-43CE-8981-F286C6BD0D06}" Namespace="AMDTruss">AMDTruss</Name>
+			<DisplayName TxtId=""><![CDATA[AMDTruss]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">Overload</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_Overload]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">MotorFailure</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_MotorFailure]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">SensorFault</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_SensorFault]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">EmergencyStop</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_EmergencyStop]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="6">LowAir</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_LowAir]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="7">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="8">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="9">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Hides>
+				<Hide GUID="{9F921B30-B5EF-6387-2937-5195339B60A7}"/>
+				<Hide GUID="{6C99AA25-E23D-4F9A-9D28-71F7BE873466}"/>
+				<Hide GUID="{47BC674F-8F95-4241-B65E-17F1BC47AD34}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{26D8CEED-7C66-407B-B5E5-7452730A150C}" Namespace="InfoLayer">InfoLayer</Name>
+			<DisplayName TxtId=""><![CDATA[EM_InfoLayer]]></DisplayName>
+			<EventId>
+				<Name Id="1">Init</Name>
+				<DisplayName TxtId=""><![CDATA[Event_DisplayText]]></DisplayName>
+				<Severity>Verbose</Severity>
+			</EventId>
+			<Hides>
+				<Hide GUID="{A72FD3C1-0CEB-4EF2-9B6F-75DD23F9BB5D}"/>
+				<Hide GUID="{DF21F815-EC4F-451A-8663-F36FBE5614CA}"/>
+				<Hide GUID="{4669FD54-06FD-4D14-B3E9-8C841EA85CCA}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{FD4A11CF-EDBA-4799-87ED-D3A0DFE8CE9D}" Namespace="IRC5">IRC5</Name>
+			<DisplayName TxtId=""><![CDATA[IRC5]]></DisplayName>
+			<Comment TxtId=""><![CDATA[Alarms asociated with the IRC5 Component]]></Comment>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">Auto</Name>
+				<DisplayName TxtId=""><![CDATA[IRC5 Not in Auto Mode]]></DisplayName>
+				<Severity>Warning</Severity>
+				<CauseRemedy Idx="1">
+					<Cause TxtId=""><![CDATA[Key Switch Position]]></Cause>
+					<Remedy TxtId=""><![CDATA[Position the key switch on the IRC5 Controller Back to Auto]]></Remedy>
+				</CauseRemedy>
+				<CauseRemedy Idx="2">
+					<Cause TxtId=""><![CDATA[Auto Acknologment]]></Cause>
+					<Remedy TxtId=""><![CDATA[The key switch is in the auto position but Auto Mode has Not Been Acknolaged on the Pendent]]></Remedy>
+				</CauseRemedy>
+				<Comment TxtId=""><![CDATA[A general message that the IRC5 controller is not in Auto Mode]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="6">Estop</Name>
+				<DisplayName TxtId=""><![CDATA[IRC5 is in an Estop State]]></DisplayName>
+				<Severity>Error</Severity>
+				<CauseRemedy Idx="1">
+					<Cause TxtId=""><![CDATA[IRC Estop has been Pressed]]></Cause>
+					<Remedy TxtId=""><![CDATA[Release the Estop Button on Pendent or Controller.]]></Remedy>
+				</CauseRemedy>
+				<CauseRemedy Idx="2">
+					<Cause TxtId=""><![CDATA[Estop State has not been Reset]]></Cause>
+					<Remedy TxtId=""><![CDATA[Reset the Estop State by pressing the Motors On button on the IRC5 Controller]]></Remedy>
+				</CauseRemedy>
+				<Comment TxtId=""><![CDATA[A general message that the IRC5 controller is not in Auto Mode]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="7">MotorSupervision</Name>
+				<DisplayName TxtId=""><![CDATA[IRC5 Motor Supervision has been Triggered]]></DisplayName>
+				<Severity>Error</Severity>
+				<CauseRemedy Idx="1">
+					<Cause TxtId=""><![CDATA[Crash]]></Cause>
+					<Remedy TxtId=""><![CDATA[Robot has crashed into somthing and needs to be recovered from.]]></Remedy>
+				</CauseRemedy>
+				<CauseRemedy Idx="2">
+					<Cause TxtId=""><![CDATA[Payload to heavy]]></Cause>
+					<Remedy TxtId=""><![CDATA[Robot is experencing unexpected payload and has faulted]]></Remedy>
+				</CauseRemedy>
+				<Comment TxtId=""><![CDATA[A Motor Supervision Event has Occored within the IRC5 Controller]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="8">MotorsOn</Name>
+				<DisplayName TxtId=""><![CDATA[Motors On State]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[IRC5 is in a motors on state]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="9">SignalsSimulated</Name>
+				<DisplayName TxtId=""><![CDATA[Signals are Simulated in the robot]]></DisplayName>
+				<DescriptionText TxtId=""><![CDATA[8IRC5 Controller has Signals Simulated and could cause unexpected behavior]]></DescriptionText>
+				<Severity>Warning</Severity>
+				<CauseRemedy Idx="1">
+					<Cause TxtId=""><![CDATA[Signals Simulated]]></Cause>
+					<Remedy TxtId=""><![CDATA[Unsimulate them in the IO screen on the robot pendent.]]></Remedy>
+				</CauseRemedy>
+				<Comment TxtId=""><![CDATA[IRC5 Controller has Signals Simulated and could cause unexpected behavior]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="10">AllTasksRunning</Name>
+				<DisplayName TxtId=""><![CDATA[All Robot Tasks are Running]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="11">AllTasksNotRunning</Name>
+				<DisplayName TxtId=""><![CDATA[All Tasks Not Running]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[All tasks are not Running in the IRC5]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="12">RunChainOK</Name>
+				<DisplayName TxtId=""><![CDATA[Run Chain OK]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Safety Run Chain is satisfied in IRC5]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="13">RunChainNotOK</Name>
+				<DisplayName TxtId=""><![CDATA[Run Chain Not OK]]></DisplayName>
+				<Severity>Warning</Severity>
+				<Comment TxtId=""><![CDATA[Safety Run Chain Not Satisfied an needs resolved before contunuing.]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="14">PP_Moved</Name>
+				<DisplayName TxtId=""><![CDATA[Program Pointer has been Moved]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Program pointer Event has occored where pointer has been moved in the IRC5]]></Comment>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{1925B3A7-2DAD-418E-BE93-46F7FF5D494A}"/>
+				<Hide GUID="{BAF5F58A-2346-4C60-81E7-ECFAD7DCE2CA}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{54BC6A09-7C1F-4C30-BEB3-0E2710DDE4AC}" Namespace="Infeed">Infeed</Name>
+			<DisplayName TxtId=""><![CDATA[Infeed]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">InfeedTimeout</Name>
+				<DisplayName TxtId=""><![CDATA[InfeedTimeout]]></DisplayName>
+				<DescriptionText TxtId=""><![CDATA[This warning is triggered when the infeed has been running, waiting for a board for more than 10s]]></DescriptionText>
+				<Severity>Warning</Severity>
+				<CauseRemedy Idx="1">
+					<Cause TxtId=""><![CDATA[Board stuck in infeed conveyor]]></Cause>
+					<Remedy TxtId=""><![CDATA[Push board all the way up against the infeed gate]]></Remedy>
+				</CauseRemedy>
+			</EventId>
+			<EventId>
+				<Name Id="6">InfeedNotResetting</Name>
+				<DisplayName TxtId=""><![CDATA[InfeedNotResetting]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{06BDF5AD-E7B0-4492-A518-3ACFB15E489F}"/>
+				<Hide GUID="{6A2C12DC-2F93-4DF9-93A0-B8A6F190459C}"/>
+				<Hide GUID="{9C011B62-961F-4407-B8F7-F4F9A5E1F807}"/>
+				<Hide GUID="{B31BC5BB-19DA-48DA-9D4F-CEEAD6E38682}"/>
+				<Hide GUID="{07397A63-3CE1-47CB-BC20-B70605E35BAC}"/>
+				<Hide GUID="{55D12CCF-7513-480E-B100-3B9C118C9782}"/>
+				<Hide GUID="{EC5C5272-D527-406E-8246-86EBF277759F}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{A8EB3C66-BDC4-473A-85E7-EDEAECB84750}" Namespace="Carriage">Carriage</Name>
+			<DisplayName TxtId=""><![CDATA[Carriage]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">GrabTorqueNotFinished</Name>
+				<DisplayName TxtId=""><![CDATA[GrabTorqueNotFinished]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="6">ReleaseNotFinished</Name>
+				<DisplayName TxtId=""><![CDATA[ReleaseNotFinished]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="7">MoveIdleNotFinished</Name>
+				<DisplayName TxtId=""><![CDATA[MoveIdleNotFinished]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{E083EEAE-B6BA-4B9D-8D3E-25BA26EDD8F3}"/>
+				<Hide GUID="{D636CD7E-9FF9-4E9C-8D09-D098F720DD90}"/>
+				<Hide GUID="{5753B179-5E85-47B4-B55A-53E89EBE81F3}"/>
+				<Hide GUID="{7931214D-68D7-4811-B525-61459D159F3A}"/>
+				<Hide GUID="{D473BD9D-3090-44A8-A35C-EEF3DA56338F}"/>
+				<Hide GUID="{7F029083-215E-4F9A-8AE9-EEDB84AC9AFE}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{DCCA2506-F1DD-4840-A669-1102EF8E1846}" Namespace="Handoff">Handoff</Name>
+			<DisplayName TxtId=""><![CDATA[Handoff]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{065D6938-D7C9-49CC-B52B-DDD505B1E9C5}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{F0FCC1F6-7879-4D16-A509-73906B66ED54}" Namespace="MBI">MBI</Name>
+			<DisplayName TxtId=""><![CDATA[MBI]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">BoardNotDropping</Name>
+				<DisplayName TxtId=""><![CDATA[Board Not Dropping into Infeed]]></DisplayName>
+				<DescriptionText TxtId=""><![CDATA[This warning is triggered when the MBI hasn't dropped a board in the system in more than 30s]]></DescriptionText>
+				<Severity>Warning</Severity>
+				<CauseRemedy Idx="1">
+					<Cause TxtId=""><![CDATA[Infeed not taking board into the system]]></Cause>
+					<Remedy TxtId=""><![CDATA[Fix downstream issues]]></Remedy>
+				</CauseRemedy>
+				<CauseRemedy Idx="2">
+					<Cause TxtId=""><![CDATA[Problem in the handshake between infeed and MBI]]></Cause>
+					<Remedy TxtId=""><![CDATA[Contact support or manually load next board into infeed to reset handshake]]></Remedy>
+				</CauseRemedy>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{E8395947-7F43-44C1-BA54-B50B30EF8479}"/>
+				<Hide GUID="{807403A1-0B19-4723-9F4F-F1D13B40FB95}"/>
+				<Hide GUID="{DBD5E45B-1663-45C2-AB3D-8B7090A93960}"/>
+				<Hide GUID="{B8E0BDC9-A631-42DE-9978-4CC176E7E014}"/>
+				<Hide GUID="{6000CFB2-26E3-43BC-BB7E-CD3B5F46C9E7}"/>
+				<Hide GUID="{BE31C61A-2720-4B82-8278-0046586F541B}"/>
+				<Hide GUID="{39F59124-A9C9-4DA5-A9C7-83ED7E75BC68}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{BCA50E15-FC3A-4B1F-83FF-8496005328EF}" Namespace="Outfeed_Jig">Outfeed_Jig</Name>
+			<DisplayName TxtId=""><![CDATA[Outfeed_Jig]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">OutfeedSafetyDropped</Name>
+				<DisplayName TxtId=""><![CDATA[OutfeedSafetyDropped]]></DisplayName>
+				<DescriptionText TxtId=""><![CDATA[Outfeed safety has been tripped and conveyors won't move forward until safety has been reset.]]></DescriptionText>
+				<Severity>Warning</Severity>
+				<CauseRemedy Idx="1">
+					<Cause TxtId=""><![CDATA[Light curtains in outfeed were tripped]]></Cause>
+					<Remedy TxtId=""><![CDATA[Remove anything blocking light curtains and reset safey from pendant to clear]]></Remedy>
+				</CauseRemedy>
+				<CauseRemedy Idx="2">
+					<Cause TxtId=""><![CDATA[Outfeed door open]]></Cause>
+					<Remedy TxtId=""><![CDATA[Close door and reset safety to clear]]></Remedy>
+				</CauseRemedy>
+			</EventId>
+			<EventId>
+				<Name Id="6">IndexingBlocked</Name>
+				<DisplayName TxtId=""><![CDATA[IndexingBlocked]]></DisplayName>
+				<DescriptionText TxtId=""><![CDATA[Conveyor is trying to index but something is blocking it]]></DescriptionText>
+				<Severity>Warning</Severity>
+				<CauseRemedy Idx="1">
+					<Cause TxtId=""><![CDATA[Donwstream conveyors blocking index]]></Cause>
+					<Remedy TxtId=""><![CDATA[Wait until operators clear off tables]]></Remedy>
+				</CauseRemedy>
+				<CauseRemedy Idx="2">
+					<Cause TxtId=""><![CDATA[Safety is tripped in outfeed area]]></Cause>
+					<Remedy TxtId=""><![CDATA[Clear light curtains of any obsructions and make sure outfeed doors are closed and reset safety from the pendant]]></Remedy>
+				</CauseRemedy>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{C255C753-C520-406F-B350-4F74768B651B}"/>
+				<Hide GUID="{1D580D83-D0D4-4315-93C4-39AD909F2949}"/>
+				<Hide GUID="{F420FDFF-85DD-4AC7-A865-D2F17BADF795}"/>
+				<Hide GUID="{2000C75E-6D1D-4805-85BA-C2258E77DB11}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{2940BA67-8932-4BC9-85A1-542ADE679AFC}" Namespace="Preplate">Preplate</Name>
+			<DisplayName TxtId=""><![CDATA[Preplate]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{313A4260-1249-4ACC-ACD3-94D78BE059DE}"/>
+				<Hide GUID="{17528232-3962-47E0-92FA-1F436F26C2A7}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{5F15616A-BE9B-4E7E-90F8-D919671581D0}" Namespace="Press">Press</Name>
+			<DisplayName TxtId=""><![CDATA[Press]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{46B565B4-49B1-48A3-AB98-ADB86891C52D}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{94FB221E-5CDC-4D75-84EC-35BBE1341517}" Namespace="Robot">Robot</Name>
+			<DisplayName TxtId=""><![CDATA[Robot]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{7C585836-F101-4D10-9CDF-265DE8E3F43F}"/>
+				<Hide GUID="{A405C2B9-CA47-478F-AEF5-6DDA57A01676}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{91458515-4183-4161-A00B-D30F8CF43160}" Namespace="Transporter">Transporter</Name>
+			<DisplayName TxtId=""><![CDATA[Transporter]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">Carriage1Suspended</Name>
+				<DisplayName TxtId=""><![CDATA[Carriage1Suspended]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="6">Carriage2Suspended</Name>
+				<DisplayName TxtId=""><![CDATA[Carriage2Suspended]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="7">Carriage3Suspended</Name>
+				<DisplayName TxtId=""><![CDATA[Carriage3Suspended]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="8">Handoff1Suspended</Name>
+				<DisplayName TxtId=""><![CDATA[Handoff1Suspended]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="9">Handoff2Suspended</Name>
+				<DisplayName TxtId=""><![CDATA[Handoff2Suspended]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="10">Handoff3Suspended</Name>
+				<DisplayName TxtId=""><![CDATA[Handoff3Suspended]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="11">Handoff4Suspended</Name>
+				<DisplayName TxtId=""><![CDATA[Handoff4Suspended]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{84B74619-2F0D-47A6-8D9F-4CE64223A48F}"/>
+				<Hide GUID="{E0BDE66C-8584-4FBF-A12B-516B5B4E2593}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{C833D4AD-145E-4749-B3E6-118643E6DBD1}" Namespace="SamComms">SamComms</Name>
+			<DisplayName TxtId=""><![CDATA[SamComms]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{50CFE6AD-DE88-4B3D-9876-1E0C2F2BD9F1}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{58B2A7D3-5E70-404D-B523-0F8ED50E95BE}" Namespace="Machine">Machine</Name>
+			<DisplayName TxtId=""><![CDATA[Machine]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{0FE2BB06-8DF9-4DBB-BAF1-0A113C14A8E3}"/>
+			</Hides>
+		</DataType>
+		<DataType>
+			<Name GUID="{B8FEAA4F-C8C0-466A-86D1-40A077DF71D6}" Namespace="OutfeedConveyor">OutfeedConveyor</Name>
+			<DisplayName TxtId=""><![CDATA[OutfeedConveyor]]></DisplayName>
+			<EventId>
+				<Name Id="1">InitReferenceEvent</Name>
+				<DisplayName TxtId=""><![CDATA[DT_GLOBAL_INIT_REFERENCE_EVENT]]></DisplayName>
+				<Severity>Info</Severity>
+				<Comment TxtId=""><![CDATA[Reference Event that should be the first in all event classes]]></Comment>
+			</EventId>
+			<EventId>
+				<Name Id="2">InfoMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_InfoMessage]]></DisplayName>
+				<Severity>Info</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="3">WarnMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_WarnMessage]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="4">AlarmMessage</Name>
+				<DisplayName TxtId=""><![CDATA[DT_AMDTruss_Event_AlarmMessage]]></DisplayName>
+				<Severity>Error</Severity>
+			</EventId>
+			<EventId>
+				<Name Id="5">NoTrussData</Name>
+				<DisplayName TxtId=""><![CDATA[NoTrussData]]></DisplayName>
+				<Severity>Warning</Severity>
+			</EventId>
+			<Translations>
+				<Text TxtId="DT_GLOBAL_INIT_REFERENCE_EVENT">
+					<Text LcId="1033"><![CDATA[Init Reference should never be set]]></Text>
+					<Text LcId="2058"><![CDATA[Init Reference alarma no se debe usar]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_InfoMessage">
+					<Text LcId="1033"><![CDATA[{0} - Info Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_WarnMessage">
+					<Text LcId="1033"><![CDATA[{0} - Warning Message]]></Text>
+				</Text>
+				<Text TxtId="DT_AMDTruss_Event_AlarmMessage">
+					<Text LcId="1033"><![CDATA[{0} - Error Message]]></Text>
+				</Text>
+			</Translations>
+			<Hides>
+				<Hide GUID="{BBD9D339-2BF3-4564-ACAF-C12E707FF1F4}"/>
+				<Hide GUID="{2BFF256C-8DA1-4CE7-8946-E407C5256868}"/>
+				<Hide GUID="{32432D15-0D9C-45AA-ABCB-A827FD6C0CBD}"/>
+			</Hides>
+		</DataType>
+	</DataTypes>
+</TcModuleClass>

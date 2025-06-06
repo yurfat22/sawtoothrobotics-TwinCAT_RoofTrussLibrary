@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MessageBox_Messages" Id="{ee7446ca-f978-4d8f-b22f-c75bbf426c66}">
+    <Declaration><![CDATA[TYPE
+    ST_MessageBox_Messages : STRUCT
+        Message1 : STRING[80];
+        Message2 : STRING[80];
+        Message3 : STRING[80];
+        Message4 : STRING[80];
+        Message5 : STRING[80];
+        Message6 : STRING[80];
+        Message7 : STRING[80];
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

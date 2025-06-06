@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_CommandStepParser" Id="{780b93d5-ee76-4b0a-a5a7-3a041d38f4cf}">
+    <Declaration><![CDATA[INTERFACE I_CommandStepParser]]></Declaration>
+    <Method Name="AssemblyEndParse" Id="{722dea96-eb4a-4273-b71d-372bbe543b92}">
+      <Declaration><![CDATA[METHOD AssemblyEndParse : BOOL
+
+VAR_INPUT
+    Step          : ST_CSV_Step;
+    StepDetailOut : REFERENCE TO ST_AssemblyEnd;
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="AssemblyStartParse" Id="{6e4cbf22-84c0-40b3-910b-b7bb7716ba2c}">
+      <Declaration><![CDATA[METHOD AssemblyStartParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_AssemblyStart;
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="BoardInfoParse" Id="{b618ac8d-dc30-4656-b711-a5e4382cef1f}">
+      <Declaration><![CDATA[METHOD BoardInfoParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_BoardInfo;
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="BoardParse" Id="{7dd8f931-da09-4fd9-85fb-aa51ac2ee8ff}">
+      <Declaration><![CDATA[METHOD BoardParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_Board;
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="NailPlateParse" Id="{672f408d-2c55-4c86-8dc9-9798e4f146c8}">
+      <Declaration><![CDATA[METHOD NailPlateParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_BoardInfo;
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="TrussInfoParse" Id="{c9b1a93c-4891-47f8-ad33-6f5cd37c5c4d}">
+      <Declaration><![CDATA[METHOD TrussInfoParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_TrussInfo;
+END_VAR]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

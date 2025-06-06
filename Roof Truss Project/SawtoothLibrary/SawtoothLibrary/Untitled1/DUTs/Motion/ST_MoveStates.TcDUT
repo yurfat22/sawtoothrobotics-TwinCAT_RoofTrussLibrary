@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MoveStates" Id="{29f68f7c-f85f-4dc1-824c-82553d0bc5c5}">
+    <Declaration><![CDATA[TYPE
+    ST_MoveStates : STRUCT
+        Idle    : UDINT;
+        Pick    : UDINT;
+        Hold    : UDINT;
+        Clear   : UDINT;
+        Drop    : UDINT;
+        Grab    : UDINT;
+        Release : UDINT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

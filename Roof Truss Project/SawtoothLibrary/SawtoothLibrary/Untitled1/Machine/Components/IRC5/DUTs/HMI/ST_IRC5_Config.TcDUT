@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_IRC5_Config" Id="{9e336528-6cf7-4aed-b6eb-f100100486f4}">
+    <Declaration><![CDATA[TYPE
+    ST_IRC5_Config : STRUCT
+        ExtendTime  : LREAL;
+        RetractTime : LREAL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

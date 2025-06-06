@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_CSV_Generic" Id="{7db3dbc0-4ad5-47b4-8e70-15af8af455da}">
+    <Declaration><![CDATA[TYPE
+    ST_CSV_Generic : STRUCT
+        CSVLines : ARRAY[1..600] OF ST_CSV_Line;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Robot_Handshake_Output" Id="{5013e536-a134-4595-9252-6dd82e5eb84a}">
+    <Declaration><![CDATA[TYPE
+    ST_Robot_Handshake_Output : STRUCT
+        Abort              : BOOL;
+        MessageSolution    : USINT;
+        MessageAcknowledge : BOOL;
+        SubStepResponse    : E_WaitSync;
+        Execute_Service    : BOOL;
+        Execute_Step       : BOOL;
+        Execute_ServiceNum : USINT;
+        Execute_StepNum    : UINT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

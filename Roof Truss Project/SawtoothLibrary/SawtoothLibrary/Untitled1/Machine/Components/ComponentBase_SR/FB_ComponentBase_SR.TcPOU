@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_ComponentBase_SR" Id="{ff7dc399-0fd3-4f30-ad77-8c6bfec79dda}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ComponentBase_SR EXTENDS FB_ComponentBase
+VAR_INPUT
+END_VAR
+
+VAR_OUTPUT
+END_VAR
+
+VAR
+    Comp_Alarms : ARRAY[1..20] OF FB_TcAlarm;
+
+    i : UDINT;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="Methods" Id="{7b22317b-ca0d-4a05-9f65-ebb790dfcf5a}" />
+    <Folder Name="Properties" Id="{0429b360-a469-401b-a985-cdad475e14e7}" />
+    <Method Name="ClearAlarms" Id="{e576e51a-e7ca-435e-8632-a9e461cc0f08}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ClearAlarms
+VAR_INPUT
+    MyAlarms : ARRAY[1..Global.MAX_ALARM_COUNT] OF FB_TcAlarm;
+END_VAR
+
+VAR
+    i : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO Global.MAX_ALARM_COUNT DO
+    MyAlarms[i].Clear(0, 0);
+END_FOR;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RaiseAlarm2Args" Id="{89d22782-64bd-4c9b-9078-27d9d028765d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD RaiseAlarm2Args
+VAR_IN_OUT
+    fbAlarm : FB_TcAlarm; //Alarm to be raised
+END_VAR
+
+VAR_INPUT
+    String_1 : STRING; //First String Parameter (The Name of this component will be applied first automatically)
+    String_2 : STRING; //Second String Parameter
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_RaiseAlarmWithStringParameters(Alarm := fbAlarm, String_1 := Name, String_2 := String_1, String_3 := String_2);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset" Id="{5350edae-f92c-4067-941d-83a15372d499}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Reset : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_Error   := FALSE;
+_ErrorID := 0;
+
+IF SUPER^.Reset() THEN
+    Reset := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

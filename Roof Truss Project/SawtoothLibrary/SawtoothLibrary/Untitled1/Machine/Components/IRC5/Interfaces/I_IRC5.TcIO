@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_IRC5" Id="{aaf7621a-b618-424d-9754-d98352a6e316}">
+    <Declaration><![CDATA[INTERFACE I_IRC5]]></Declaration>
+  </Itf>
+</TcPlcObject>

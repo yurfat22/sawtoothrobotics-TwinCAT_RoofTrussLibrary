@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_ControlSource_HMI_Machine" Id="{f972ccb3-1c6c-4ab8-9f87-e2c980f477fc}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ControlSource_HMI_Machine EXTENDS FB_ControlSource_HMI
+VAR_INPUT
+END_VAR
+
+VAR_OUTPUT
+END_VAR
+
+VAR
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{7489a98d-6a82-4a3f-8367-c196a13d9b4c}" />
+    <Method Name="CyclicLogic" Id="{17fa8859-21b7-462c-9028-2239bae8f3c5}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CyclicLogic();
+
+//Change the start permissive for the Machine 
+MainPMLControl_Simplified.StartPermissive := MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Idle OR
+                                             (MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Held);]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_TaskStatus" Id="{c01049be-fc80-4ae3-b1d4-aa16c394b2ec}">
+    <Declaration><![CDATA[TYPE
+    ST_TaskStatus : STRUCT
+        State           : STRING; // E.g., "active"
+        CurrentTaskId   : UDINT; // 32-bit integer for task ID UDINT 0-4294967295
+        LineNumber      : INT; // Assuming line numbers are small integers
+        StationName     : STRING[50]; // Adjust size as needed
+        SubStation      : STRING[50]; // Adjust size as needed
+        TotalTaskSteps  : DINT; // Total number of steps in the task
+        CurrentTaskStep : DINT; // Current step number
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,194 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_Indicator" Id="{ed010e85-f1ac-4322-94b7-f14d6f0299c2}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_Indicator EXTENDS FB_ComponentBase_SR IMPLEMENTS I_Indicator
+VAR
+
+    // Outputs
+
+    IndicatorOutput AT %Q* : BOOL;
+
+    // HMI
+
+    Indicator_HMI : ST_Indicator_HMI;
+
+    // Alarms
+
+    IndicatorAlarms : ARRAY[1..Indicator_ALARMS_COUNT] OF FB_TcAlarm;
+
+    // Internal variables
+
+    Pulse     : FB_PulseGenerator;
+    _Flashing : BOOL;
+    _On       : BOOL;
+
+END_VAR
+
+VAR CONSTANT
+    Indicator_ALARMS_COUNT : UDINT := 5;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{793a438e-8b4a-4273-ae98-184afab389a8}" />
+    <Folder Name="I_CyclicFB" Id="{50934f65-5f9a-44db-97b1-1e0e0dc03e17}" />
+    <Folder Name="I_Template" Id="{e5565f98-12ce-47de-8158-4b402d784447}" />
+    <Folder Name="Methods" Id="{fded1359-9773-4033-b1fe-88cbfb8a401d}" />
+    <Folder Name="Properties" Id="{8661cad9-cc95-43a0-b387-4594bd6b4ed5}" />
+    <Method Name="CreateEvents" Id="{69edbd4a-9cc7-4356-bdca-17f708619a85}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_CreateAllEventsInClass(Alarms     := IndicatorAlarms,
+                         ClassSize  := SIZEOF(TC_EVENTS.ComponentBase),
+                         pInitEvent := ADR(TC_EVENTS.ComponentBase.InitReferenceEvent),
+                         Prefix     := _Name);
+
+SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{7d2b89bf-8791-4bb0-8e73-3f76c01a9fec}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+IF _Flashing THEN
+    Pulse.CyclicLogic();
+    IndicatorOutput := Pulse.PulseOutput;
+END_IF
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := IndicatorAlarms, CurrentSeverity := _CurrentAlarmSeverity);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Flash" Id="{f458df86-8ff5-4edd-9fa2-e0993ba9901f}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Flash]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_Flashing := TRUE;
+_On       := FALSE;
+
+IndicatorOutput := Pulse.PulseOutput;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Flashing" Id="{a4932e8a-4897-42c7-9759-38925d2788f1}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Flashing : BOOL]]></Declaration>
+      <Get Name="Get" Id="{ac1ef52a-ab08-49a2-acec-3bf1ef59baed}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Flashing := _Flashing;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Initialize" Id="{0c76f14f-9965-435e-b292-3902454f980e}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{7f222f43-eff7-4b11-8b5c-f0394503bee1}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT IndicatorAlarms[E_ComponentBase.SimulationWarning].bRaised AND _Simulate AND NOT Parameters_BaseComponent.INHIBIT_SIMULATION_WARNING THEN
+    IndicatorAlarms[E_ComponentBase.SimulationWarning].Raise(0);
+ELSIF IndicatorAlarms[E_ComponentBase.SimulationWarning].bRaised AND NOT _Simulate THEN
+    IndicatorAlarms[E_ComponentBase.SimulationWarning].Clear(0, 0);
+END_IF
+
+_CurrentAlarmSeverity := TcEventSeverity.Verbose;
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := IndicatorAlarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Off" Id="{30d8980a-b740-4677-91ca-eac87f3a7208}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Off : BOOL]]></Declaration>
+      <Get Name="Get" Id="{c5c4328e-ab5e-4ee2-aa53-6d1ad7cadadf}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Off := NOT _ON AND NOT _Flashing;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="OffTime" Id="{c57b4239-6948-4ad9-bedf-672d8178212a}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC OffTime : TIME]]></Declaration>
+      <Set Name="Set" Id="{dc6c845c-63d2-494b-819c-ede682509e15}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Pulse.OffTime := OffTime;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="On" Id="{7fc3cb81-daf4-4bf2-84ed-048fafd66410}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY On : BOOL]]></Declaration>
+      <Get Name="Get" Id="{0e3a66aa-d69a-4ecb-9188-342af31e82d5}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[On := _On;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="OnTime" Id="{c847daa9-67e4-4b0a-bb54-7236e93d6c42}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC OnTime : TIME]]></Declaration>
+      <Set Name="Set" Id="{f0ab1366-ed32-4b5a-ba41-f8d23e416810}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Pulse.OnTime := OnTime;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Reset" Id="{330f7997-cdc7-4e1d-88f4-7a5a4af27f6a}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Reset : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TurnOff();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="TurnOff" Id="{ab47395d-7219-4b5f-adac-e7e6852c78d9}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD TurnOff]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_Flashing := FALSE;
+_On       := FALSE;
+
+IndicatorOutput := FALSE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="TurnOn" Id="{1ba73b21-cf21-4808-a6e0-c3003a413f0e}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD TurnOn]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_Flashing := FALSE;
+_On       := TRUE;
+
+IndicatorOutput := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

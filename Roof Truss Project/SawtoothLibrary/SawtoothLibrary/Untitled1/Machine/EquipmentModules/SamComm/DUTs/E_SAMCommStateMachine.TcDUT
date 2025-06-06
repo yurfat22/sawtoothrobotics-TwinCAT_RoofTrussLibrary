@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_SAMCommStateMachine" Id="{0b0caf74-95b5-4c87-bdf4-62b502285760}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_SAMCommStateMachine : (
+        CREATE_RFI    := 0,
+        SEND_RFI      := 1,
+        WATCH_EVENTS  := 2,
+        CREATE_STATUS := 3,
+        SEND_STATUS   := 4,
+        CREATE_RFT    := 5,
+        SEND_RFT      := 6,
+        PROCESS_REPLY := 7,
+        CREATE_TASK   := 8,
+        DISCONNECT    := 9,
+        DISCONNECTING := 10,
+        DEBUG         := 99
+
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,96 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <GVL Name="Global" Id="{4d6c8d0a-211e-42a3-a28e-2b79f123fd2b}">
+    <Declaration><![CDATA[VAR_GLOBAL
+    // change speeds of motors 
+
+    AutoMode : BOOL := TRUE;
+
+    // Bell Evermen point backup
+
+    BEPoint_Backup : ST_BEPointDefinitions;
+
+    // Sys Config backup values
+
+    Sys_Config : ST_SysConfig;
+
+    //trigger all message boxes
+
+    testmessagebox : BOOL;
+
+    DOUBLEPICK_MIN_LENGTH : LREAL;
+	
+	BoardToleranceRatio_short : LREAL := 0.0155;
+
+    BoardToleranceRatio_med : LREAL := 0.021;
+
+    BoardToleranceRatio_long : LREAL := 0.0249;
+
+    BoardAcceptanceTolerance_mm : LREAL := 25;
+
+// 
+//     BoardToleranceRatio_short : LREAL := 0.0039;
+// 
+//     BoardToleranceRatio_med : LREAL := 0.0132;
+// 
+//     BoardToleranceRatio_long : LREAL := 0.0135;
+// 
+//     BoardAcceptanceTolerance_mm : LREAL := 10;
+
+END_VAR
+
+VAR_GLOBAL CONSTANT
+    // Max number of commands we are able to receive in a JSON file
+
+    MAX_COMMAND_COUNT : UDINT := 12;
+
+    // Max number of steps we can see in a JSON file
+
+    MAX_STEP_COUNT   : UDINT := 300;
+    MAX_DETAIL_COUNT : UDINT := 35;
+    MAX_DATA_COUNT   : UDINT := 20;
+
+    // Max number of details we can receive in a JSON file
+
+    MAX_POSITIONS : UDINT := 10;
+
+    //Max number of material we expect to see per conveyor
+
+    MAX_OUTFEED_MATERIAL : UDINT := 50;
+
+    MAX_NUMBER_OF_BOARDS : UDINT := MAX_STEP_COUNT;
+
+    MAX_NUMBER_OF_PLATES : UDINT := 50;
+
+    MAX_NUMBER_OF_POSITIONS : UDINT := MAX_POSITIONS;
+
+    //max number of alarms by default on EquipmentModule_SR and CustomComponents
+
+    MAX_ALARM_COUNT : UDINT := 6;
+
+    BOARD_LENGTH_SENSOR1_LOCATION : LREAL := 2652.7125;
+
+    BOARD_LENGTH_SENSOR2_LOCATION : LREAL := 5092.7;
+
+    MAX_BOARDLEN_LIM : LREAL := 3200;
+
+    MAX_TASKS : INT := 4;
+
+    PLCPRJ_BUFFER_SIZE : UDINT := 262144; (* Max. internal fifo/receiver buffer size *)
+
+    PLCPRJ_CLIENT_SEND_CYCLE_TIME : TIME := T#5S;
+    PLCPRJ_RECEIVE_POLLING_TIME   : TIME := T#100MS;
+    PLCPRJ_RECEIVE_TIMEOUT        : TIME := T#30S;
+
+    (* Some project specific error codes *)
+
+    PLCPRJ_ERROR_RECEIVE_TIMEOUT   : UDINT := 16#8101; (* Receive timeout *)
+    PLCPRJ_ERROR_SENDFIFO_OVERFLOW : UDINT := 16#8102; (* Send fifo overflow *)
+    PLCPRJ_ERROR_RECFIFO_OVERFLOW  : UDINT := 16#8103; (* Receive fifo overflow *)
+
+    PICK_DEVICE_WIDTH   : REAL := 203;
+    DEFAULT_PICK_OFFSET : REAL := 200;
+
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

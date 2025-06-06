@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="RackStatus" Id="{d80071a5-2851-4e8a-81a5-a71433ab7f21}">
+    <Declaration><![CDATA[TYPE
+    RackStatus : STRUCT
+        available : BOOL;
+        blocked   : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

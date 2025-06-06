@@ -1,0 +1,761 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Robot_Press" Id="{65b3d3d7-b3e5-420f-ab37-029480431334}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Robot_Press EXTENDS FB_Robot
+
+VAR
+
+    Plates : ST_Plates;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{4d735f8e-ed84-4c14-8df1-cb3b6c6428f5}" />
+    <Folder Name="Methods" Id="{e94cb5f6-bfd8-408f-9dc3-6663bc60ca02}">
+      <Folder Name="CommandSteps" Id="{3ede3675-1ce8-4655-a961-b41ae5de2f25}" />
+    </Folder>
+    <Folder Name="Properties" Id="{692eeab0-3cdb-456d-a6ef-aaf17e3579b7}" />
+    <Method Name="CyclicLogic" Id="{62fccf2d-e82a-4d8b-8ca9-20c55430c690}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR
+
+VAR
+
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+SUPER^.CyclicLogic();
+
+UI_MessageBox();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogicSimulation" Id="{f0632cf2-576a-4066-b330-8746d16d8599}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogicSimulation : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteDetail" Id="{0aecad91-ad18-4436-bd7a-25aebb310d7e}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD ExecuteDetail : BOOL
+VAR_INPUT
+    StepToRun : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExecuteDetail := FALSE;
+
+CASE Handshake_Step OF
+    0:
+        Robot.Handshake.OUT.Execute_Step    := TRUE;
+        Robot.Handshake.OUT.Execute_StepNum := UDINT_TO_UINT(StepToRun);
+
+        IF Robot.Handshake.IN.Executing_Step = TRUE THEN
+            Handshake_Step := 1;
+        END_IF
+
+    1:
+        IF Robot.Handshake.IN.Executing_Step = FALSE AND Robot.Handshake.IN.StepComplete = TRUE THEN
+            Handshake_Step := 2;
+        END_IF
+
+    2:
+        Robot.Handshake.OUT.Execute_Step    := FALSE;
+        Robot.Handshake.OUT.Execute_StepNum := 0;
+
+        IF Robot.Handshake.IN.StepComplete = FALSE THEN
+            ExecuteDetail  := TRUE;
+            Handshake_Step := 0;
+        END_IF
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteDetail_SIM" Id="{6d9af5e2-4736-4823-8549-1cdc141f4e7d}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD PROTECTED ExecuteDetail_SIM : BOOL
+VAR_INPUT
+    StepToRun : UDINT;
+END_VAR
+
+VAR_INST
+    robotWS_State : E_Press_States;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE robotWS_State OF
+    PRESS_INIT:
+        IF WaitSync_Handler(E_WaitSync.PRESS_PREPLATE_SIM_SYNC) THEN
+            robotWS_State := ROBOT_PERMISSION_REQUEST;
+        END_IF
+
+    ROBOT_PERMISSION_REQUEST:
+        IF WaitSync_Handler(E_WaitSync.NAILPLATE_READY_TO_PLACE) THEN
+            robotWS_State := ROBOT_PERMISSION_GRANTED_WS;
+        END_IF
+
+    ROBOT_PERMISSION_GRANTED_WS:
+        IF WaitSync_Handler(E_WaitSync.PRESS_ROBOT_PERMISSION_GRANTED) THEN
+            robotWS_State := NP_PLACED_WS;
+        END_IF
+
+    NP_PLACED_WS:
+        IF WaitSync_Handler(E_WaitSync.NAILPLATE_PLACED) THEN
+            robotWS_State := NP_DONE_WS;
+        END_IF
+
+    NP_DONE_WS:
+        ExecuteDetail_SIM := true;
+        robotWS_State     := PRESS_INIT;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteStep" Id="{e30d31ae-18c7-4a25-a866-60ef4dc2f991}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD ExecuteStep : BOOL
+VAR_INPUT
+    Step : ST_CSV_Step;
+END_VAR
+
+VAR_INST
+    LastExecutionTime  : ULINT; // 64-bit unsigned for F_GetSystemTime
+    CurrentTime        : ULINT;
+    LastHourCheck      : ULINT;
+    ExecutionTime      : ULINT;
+    NailPlateTimes     : ARRAY[0..9] OF ULINT; // Buffer for 10 samples
+    TotalTime          : REAL; // Use REAL for floating-point calc
+    TimeBufferIndex    : INT  := 0;
+    TimeSampleCount    : INT  := 0;
+    NailPlatesPerMin   : REAL := 0.0; // Plates per minute
+    NailPlatesPerHour  : REAL := 0.0; // Plates per hour
+    HourAccumulator    : REAL := 0.0;
+    ShiftSampleCount   : INT  := 0;
+    ShiftNailPlateAvgs : ARRAY[0..7] OF REAL; // 8-hour shift storage
+    ShiftHourIndex     : INT := 0;
+    BoardNumber        : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExecuteStep := FALSE;
+
+CASE Step.seqName OF
+    E_CommandName.BoardInfo:
+        BoardNumber := STRING_TO_INT(Step.Details[1].Datas[2]);
+		ExecuteStep := TRUE;
+    E_CommandName.NailPlate:
+
+        NailPlateParse(Step, Plates);
+
+        // clear out array first
+        Robot.Clear_DataToSend();
+
+        // first entry is always step type
+        Robot.RecipeData_ToSend[0] := E_CommandName.NailPlate;
+
+        Robot.RecipeData_ToSend[1] := UDINT_TO_DINT(Step.DetailCount);
+
+        Robot.RecipeData_ToSend[2] := (Plates.Plates[DetailIndex].PlateNumber + (BoardNumber * 10));
+
+        Robot.RecipeData_ToSend[3] := ExtractNumFromString(Plates.Plates[DetailIndex].PlateGauge);
+
+        Robot.RecipeData_ToSend[4] := REAL_TO_DINT(Plates.Plates[DetailIndex].PlateWidth * 10);
+
+        Robot.RecipeData_ToSend[5] := REAL_TO_DINT(Plates.Plates[DetailIndex].PlateHeight * 10);
+
+        Robot.RecipeData_ToSend[6] := REAL_TO_DINT(Plates.Plates[DetailIndex].PlatePlaceY * 10);
+
+        Robot.RecipeData_ToSend[7] := REAL_TO_DINT(Plates.Plates[DetailIndex].PlatePlaceAngle * 10);
+
+        IF Plates.Plates[DetailIndex].TopOrBottom = 'Top' THEN
+            Robot.RecipeData_ToSend[8] := 1;
+        ELSIF Plates.Plates[DetailIndex].TopOrBottom = 'Bottom' THEN
+            Robot.RecipeData_ToSend[8] := 2;
+        ELSE
+            Robot.RecipeData_ToSend[8] := 0;
+        END_IF
+
+        IF _InSimulation THEN
+            IF ExecuteDetail_SIM(Step.seqID) THEN
+                DetailIndex := DetailIndex + 1;
+				                CurrentTime   := F_GetSystemTime();
+                ExecutionTime := CurrentTime - LastExecutionTime;
+
+                // Convert 100ns units to seconds (100ns * 10,000,000 = 1s)
+                NailPlateTimes[TimeBufferIndex] := ExecutionTime;
+                TimeBufferIndex                 := TimeBufferIndex + 1;
+
+                IF TimeBufferIndex >= 10 THEN
+                    TimeBufferIndex := 0;
+                END_IF
+
+                IF TimeSampleCount < 10 THEN
+                    TimeSampleCount := TimeSampleCount + 1;
+                END_IF
+
+                TotalTime := 0.0;
+
+                FOR i := 0 TO TimeSampleCount - 1 DO
+                    TotalTime := TotalTime + ULINT_TO_REAL(NailPlateTimes[i]) / 10000000.0; // Convert to seconds
+                END_FOR
+
+                IF TotalTime > 0.0 THEN
+                    // Calculate plates per minute (samples per average time in seconds)
+                    NailPlatesPerMin := (TimeSampleCount / TotalTime) * 60.0;
+                    // Calculate plates per hour
+                    NailPlatesPerHour := NailPlatesPerMin * 60.0;
+                END_IF
+
+                // Shift-long tracking
+                HourAccumulator  := HourAccumulator + 1.0; // Count each plate
+                ShiftSampleCount := ShiftSampleCount + 1;
+
+                // Check if an hour has passed (36000000000 100ns units = 1 hour)
+                IF (CurrentTime - LastHourCheck) >= 36000000000 THEN
+                    IF ShiftSampleCount > 0 THEN
+                        // Store hourly rate (plates per hour)
+                        ShiftNailPlateAvgs[ShiftHourIndex] := (HourAccumulator * 3600.0) / (ULINT_TO_REAL(CurrentTime - LastHourCheck) / 10000000.0);
+                        ShiftHourIndex                     := ShiftHourIndex + 1;
+                        HourAccumulator                    := 0.0;
+                        ShiftSampleCount                   := 0;
+                    END_IF
+
+                    LastHourCheck := CurrentTime;
+
+                    IF ShiftHourIndex >= 8 THEN
+                        ShiftHourIndex := 0; // Start new shift
+                    END_IF
+                END_IF
+
+                LastExecutionTime := CurrentTime;
+
+
+            END_IF
+        ELSE
+            IF ExecuteDetail(Step.seqID) THEN
+                CurrentTime   := F_GetSystemTime();
+                ExecutionTime := CurrentTime - LastExecutionTime;
+
+                // Convert 100ns units to seconds (100ns * 10,000,000 = 1s)
+                NailPlateTimes[TimeBufferIndex] := ExecutionTime;
+                TimeBufferIndex                 := TimeBufferIndex + 1;
+
+                IF TimeBufferIndex >= 10 THEN
+                    TimeBufferIndex := 0;
+                END_IF
+
+                IF TimeSampleCount < 10 THEN
+                    TimeSampleCount := TimeSampleCount + 1;
+                END_IF
+
+                TotalTime := 0.0;
+
+                FOR i := 0 TO TimeSampleCount - 1 DO
+                    TotalTime := TotalTime + ULINT_TO_REAL(NailPlateTimes[i]) / 10000000.0; // Convert to seconds
+                END_FOR
+
+                IF TotalTime > 0.0 THEN
+                    // Calculate plates per minute (samples per average time in seconds)
+                    NailPlatesPerMin := (TimeSampleCount / TotalTime) * 60.0;
+                    // Calculate plates per hour
+                    NailPlatesPerHour := NailPlatesPerMin * 60.0;
+                END_IF
+
+                // Shift-long tracking
+                HourAccumulator  := HourAccumulator + 1.0; // Count each plate
+                ShiftSampleCount := ShiftSampleCount + 1;
+
+                // Check if an hour has passed (36000000000 100ns units = 1 hour)
+                IF (CurrentTime - LastHourCheck) >= 36000000000 THEN
+                    IF ShiftSampleCount > 0 THEN
+                        // Store hourly rate (plates per hour)
+                        ShiftNailPlateAvgs[ShiftHourIndex] := (HourAccumulator * 3600.0) / (ULINT_TO_REAL(CurrentTime - LastHourCheck) / 10000000.0);
+                        ShiftHourIndex                     := ShiftHourIndex + 1;
+                        HourAccumulator                    := 0.0;
+                        ShiftSampleCount                   := 0;
+                    END_IF
+
+                    LastHourCheck := CurrentTime;
+
+                    IF ShiftHourIndex >= 8 THEN
+                        ShiftHourIndex := 0; // Start new shift
+                    END_IF
+                END_IF
+
+                LastExecutionTime := CurrentTime;
+
+                DetailIndex := DetailIndex + 1;
+            END_IF
+        END_IF
+
+        IF DetailIndex > Step.DetailCount THEN
+            DetailIndex := 1;
+            ExecuteStep := TRUE;
+        END_IF
+
+ELSE
+    ExecuteStep := TRUE;
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{0e8e09e7-974a-493a-a056-c8f726f0ada3}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{204e2c3b-e747-4975-afb4-14084ebc55e3}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(Robot);
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="UI_MessageBox" Id="{efc155ef-df11-4192-b388-ce37be190cec}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD UI_MessageBox : BOOL
+VAR_INPUT
+END_VAR
+
+VAR
+    result : USINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Robot.Handshake.IN.ErrorPresent THEN
+    CASE Robot.Handshake.IN.MessageNumber OF
+
+        //////////////////////////// Press ROBOT ERRORS ////////////////////////////
+        0:
+
+            // Idle State - Should not have an error of 0
+
+            ///////// 1-29 PROCESS ERRORS /////////
+        1:
+            // Press ERROR_REPEATEDSTEP_R1 (Already converted)
+            result := RaiseMessageBox(Header   := 'Repeated Step Warning.',
+                                      Message1 := 'Robot is trying to repeat last step',
+                                      Message2 := 'Choose RETRY to retry check',
+                                      Message3 := 'Choose ABORT to reset robot',
+                                      Btn3     := 'Retry',
+                                      Btn4     := 'Override',
+                                      Btn5     := 'Abort',
+                                      Severity := TcEventSeverity.Error);
+
+        2:
+            // Press ERROR_STEP_NOT_FOUND
+            result := RaiseMessageBox(Header   := 'Step Not Found Warning.',
+                                      Message1 := 'Robot is trying execute a step that does not exist',
+                                      Message2 := 'Choose RETRY to retry check',
+                                      Message3 := 'Choose OVERRIDE to override warning',
+                                      Message4 := 'Choose ABORT to reset robot',
+                                      Btn3     := 'Retry',
+                                      Btn4     := 'Override',
+                                      Btn5     := 'Abort',
+                                      Severity := TcEventSeverity.Error);
+
+        3:
+            // Press ERROR_PROCESSING_DATA
+            result := RaiseMessageBox(Header   := 'Processing Data Error',
+                                      Message1 := 'Check robot log for more information',
+                                      Message2 := 'Choose RETRY to retry data processing',
+                                      Message3 := 'Choose ABORT to reset robot',
+                                      Btn3     := 'RETRY',
+                                      Btn5     := 'Abort',
+                                      Severity := TcEventSeverity.Error);
+
+        4:
+            // Press ERROR_NORUNUNIT
+            result := RaiseMessageBox(Header   := 'IO Device not Connected.',
+                                      Message1 := 'Check error log for more details',
+                                      Message3 := 'click OK when ready to continue',
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        5:
+            // Press ERROR_NO_DATA_FILE
+            result := RaiseMessageBox(Header   := 'No Data File Found.',
+                                      Message1 := 'Resend data to robot and choose RETRY',
+                                      Message3 := 'Choose ABORT to start recovery process',
+                                      Btn3     := 'RETRY',
+                                      Btn5     := 'ABORT',
+                                      Severity := TcEventSeverity.Error);
+
+        6:
+            // Press ERROR_ABORT
+            result := RaiseMessageBox(Header   := 'Abort Error',
+                                      Message1 := 'Aborting',
+                                      Message3 := 'Select ABORT to continue.',
+                                      Btn3     := 'ABORT',
+                                      Severity := TcEventSeverity.Error);
+
+        10:
+            // Press Error ERROR_ABORT
+            result := RaiseMessageBox(Header   := 'Left magnet handoff not retracting',
+                                      Message1 := 'Make sure air on and retract sensor is connected correctly ',
+                                      Message3 := 'System will continue when retract signal is triggered',
+                                      Btn3     := 'OVERRIDE',
+                                      Severity := TcEventSeverity.Info);
+
+        11:
+            // Press Error ERROR_ABORT
+            result := RaiseMessageBox(Header   := 'Right magnet handoff not retracting',
+                                      Message1 := 'Make sure air on and retract sensor is connected correctly ',
+                                      Message3 := 'System will continue when retract signal is triggered',
+                                      Btn3     := 'OVERRIDE',
+                                      Severity := TcEventSeverity.Info);
+
+        30:
+            // Press Error ERROR_UNKNOWNERROR_R1
+            result := RaiseMessageBox(Header   := 'Unknown Robot Error',
+                                      Message1 := 'Check the pendant for additional information.',
+                                      Message3 := 'Press OK to continue.',
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        31:
+            // Press ERROR_PLATEDROPPED_R1
+            result := RaiseMessageBox(Header   := 'Robot Dropped Plate.',
+                                      Message1 := 'Robot no longer holding plate.',
+                                      Btn4     := 'Override',
+                                      Severity := TcEventSeverity.Info);
+
+        32:
+            // Press ERROR_TWO_PLATES_DROPPED
+            result := RaiseMessageBox(Header   := 'Robot Dropped Plate Twice.',
+                                      Message1 := 'Check End Of Arm Tool',
+                                      Message2 := 'Choose OVERRIDE if nothing wrong',
+                                      Message3 := 'Choose ABORT to reset robot',
+                                      Btn2     := 'Discard',
+                                      Btn4     := 'Override',
+                                      Btn5     := 'Abort',
+                                      Severity := TcEventSeverity.Info);
+
+        33:
+            // Press ERROR_NO_MORE_MAGS
+
+            // This one includes dynamic text for plate size
+
+            // We'll place that dynamic content in one message for clarity
+            result := RaiseMessageBox(Header   := 'No more magazines.',
+                                      Message1 := CONCAT('Plate size = ', Plates.Plates[DetailIndex].PlateDimensions),
+                                      Message3 := 'click OK when magazines are filled',
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        34:
+            // Press ERROR_EOAT_EXT_FAILURE
+            result := RaiseMessageBox(Header   := 'EOAT Failed to Extend.',
+                                      Message1 := 'Check EOAT for any blockage',
+                                      Message2 := 'Choose DISABLE to disable check',
+                                      Message3 := 'Choose RETRY to retry check',
+                                      Message4 := 'Choose OVERRIDE to override warning',
+                                      Message5 := 'Choose ABORT to reset robot',
+                                      Btn2     := 'Disable',
+                                      Btn3     := 'Retry',
+                                      Btn4     := 'Override',
+                                      Btn5     := 'Abort',
+                                      Severity := TcEventSeverity.Error);
+
+        35:
+            // Press ERROR_PLATE_NOT_FOUND
+            result := RaiseMessageBox(Header   := 'Specified Plate does not Exist.',
+                                      Message1 := 'Check data',
+                                      Message2 := 'Choose RETRY to retry check',
+                                      Message3 := 'Choose OVERRIDE to override warning',
+                                      Message4 := 'Choose ABORT to reset robot',
+                                      Btn3     := 'Retry',
+                                      Btn4     := 'Override',
+                                      Btn5     := 'Abort',
+                                      Severity := TcEventSeverity.Error);
+
+        36:
+            // Press ERROR_PLACE_OUT_OF_REACH
+            result := RaiseMessageBox(Header   := 'Robot Out of Reach',
+                                      Message1 := 'Check data',
+                                      Message2 := 'Remove the plate from the Press robot tool.',
+                                      Message3 := 'After plate is removed hit SKIP to move on.',
+                                      Message4 := 'Choose ABORT to reset robot',
+                                      Btn3     := 'SKIP',
+                                      Btn5     := 'RECOVER',
+                                      Severity := TcEventSeverity.Error);
+
+        37:
+            // Press ERROR_UNRECOGNIZED_WORLD_ZONE
+            result := RaiseMessageBox(Header   := 'Robot Unrecognized Position.',
+                                      Message1 := 'Jog Robot to safe position and retry move home',
+                                      Btn5     := 'RETRY',
+                                      Severity := TcEventSeverity.Error);
+
+        38:
+            // Press ERROR_PLATENOTDROPPED_R1
+            result := RaiseMessageBox(Header   := 'Robot Didnt Drop Plate.',
+                                      Message1 := 'Check EOAT and press for plates.',
+                                      Message2 := 'Choose OVERRIDE to override sensor.',
+                                      Message3 := 'Check RETRY to retry plate placement.',
+                                      Btn4     := 'Override',
+                                      Btn5     := 'Retry',
+                                      Severity := TcEventSeverity.Error);
+
+        40:
+            // Press ERROR_NO_HANDSHAKE_ROBOT
+            result := RaiseMessageBox(Header   := 'Robot - Waiting to Handshake',
+                                      Message1 := 'The PLC and robot may be out of sync',
+                                      Btn5     := 'Retry',
+                                      Severity := TcEventSeverity.Error);
+
+        41:
+            // Press ERROR_BAD_BOARD_DATA
+            result := RaiseMessageBox(Header   := 'Bad Board Data',
+                                      Message1 := 'Preplate CSV board data has boards that are too long/short/thick to be ran',
+                                      Message3 := 'Check files and upload new files when fixed',
+                                      Severity := TcEventSeverity.Error);
+
+        42:
+            // Press ERROR_BAD_NAIL_DATA
+            result := RaiseMessageBox(Header   := 'Bad Nail Plate Data',
+                                      Message1 := 'Preplate CSV nail plate data has incorrect plate positions',
+                                      Message3 := 'Check files and upload new files when fixed',
+                                      Severity := TcEventSeverity.Error);
+
+        43:
+            // Press ERROR_PLATE_OFFSET_TIMEOUT
+            result := RaiseMessageBox(Header   := 'Timeout updating plate offsets with PLC',
+                                      Message1 := 'Timeout updating plate offsets with PLC',
+                                      Btn3     := 'Retry',
+                                      Btn4     := 'Override',
+                                      Severity := TcEventSeverity.Error);
+
+        44:
+            // PrePlate ERROR_MAG_IN_DIS_RACK
+
+            // Also sets gTrigger_Bool[8]
+            result := RaiseMessageBox(Header   := 'Only Available Magazine is in a Disabled Rack',
+                                      Message1 := 'Re-Enable Rack',
+                                      Message3 := 'Choose RETRY to attempt Finding Valid Mgazine',
+                                      Btn5     := 'Retry',
+                                      Severity := TcEventSeverity.Error);
+
+        45:
+            // PrePlate error nail plate skipped
+
+            // Also includes dynamic text for plate size
+            result := RaiseMessageBox(Header   := 'Nail plate Skipped',
+                                      Message1 := 'Nail plate not available',
+                                      Message3 := CONCAT('Nail plate size: ', Plates.Plates[DetailIndex].PlateDimensions),
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        50:
+            // Press ERROR: Robot Read Bad Board Data
+            result := RaiseMessageBox(Header   := 'Robot Read Bad Board Data',
+                                      Message1 := 'Preplate CSV board data has boards that are too long/short/thick to be ran',
+                                      Message3 := 'Check files and upload new files when fixed',
+                                      Severity := TcEventSeverity.Error);
+
+        60:
+            // Press MESSAGE_ATSERVICE_R1
+            result := RaiseMessageBox(Header   := 'Robot at Service Position.',
+                                      Message1 := 'Choose DONE when ready to return robot to home',
+                                      Btn5     := 'DONE',
+                                      Severity := TcEventSeverity.Error);
+
+        61:
+            // Press MESSAGE_PLATE_ON_EOAT
+            result := RaiseMessageBox(Header   := 'Plate left on press EOAT.',
+                                      Message1 := 'Remove plate and choose OK to continue',
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        62:
+            // Press MESSAGE_GET_RECOVERY
+            result := RaiseMessageBox(Header   := 'Choose Restart Option',
+                                      Message1 := 'Choose FULL ABORT to clear out truss',
+                                      Message2 := 'Choose SKIP BOARD to skip to next board in recipe',
+                                      Message3 := 'Choose RESTART BOARD to remove board and restart plating',
+                                      Message4 := 'Choose SKIP PLATE to discard plate and restart from next plate',
+                                      Message5 := 'Choose RECOVER FROM STEP to remove board and restart form specified board',
+                                      Btn1     := 'FULL ABORT',
+                                      Btn2     := 'SKIP BOARD',
+                                      Btn3     := 'RESTART BOARD',
+                                      Btn4     := 'SKIP PLATE',
+                                      Btn5     := 'RECOVER FROM STEP',
+                                      Severity := TcEventSeverity.Error);
+
+        63:
+            // Press MESSAGE_BOARD_RESTART
+
+            // UI_MessageBoxes.UI_MessageBox[1].Recover.Visible := TRUE;
+
+            // UI_MessageBoxes.UI_MessageBox[1].Recover.BoardData := gBoardData;
+            result := RaiseMessageBox(Header   := 'Select Board to Restart',
+                                      Message1 := 'Select a board to start on',
+                                      Message3 := 'Select OK when system is ready to continue',
+                                      Btn1     := 'Cancel',
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        64:
+            // Press MESSAGE_PLATE_RESTART
+
+            // UI_MessageBoxes.UI_MessageBox[1].NumEntry.Visible := TRUE;
+            result := RaiseMessageBox(Header   := 'Specify Plate to Restart',
+                                      Message1 := 'Select a plate to start on',
+                                      Btn5     := 'OK',
+                                      Severity := TcEventSeverity.Error);
+
+        65:
+            // Press MESSAGE_CONFIRM_SKIP
+            result := RaiseMessageBox(Header   := 'Confirm Skip Current Step',
+                                      Message1 := 'Are you sure you want to skip current step?',
+                                      Btn1     := 'GO BACK',
+                                      Btn5     := 'CONFIRM',
+                                      Severity := TcEventSeverity.Error);
+
+        66:
+            // Press MESSAGE_CONFIRM_RETRY
+            result := RaiseMessageBox(Header   := 'Confirm Retry Current Step',
+                                      Message1 := 'Are you sure you want to retry current step?',
+                                      Btn1     := 'GO BACK',
+                                      Btn5     := 'CONFIRM',
+                                      Severity := TcEventSeverity.Error);
+
+        67:
+            // Press MESSAGE_CONFIRM_ABORT
+            result := RaiseMessageBox(Header   := 'Confirm Abort Current Truss',
+                                      Message1 := 'Are you sure you want to abort current truss?',
+                                      Btn1     := 'GO BACK',
+                                      Btn5     := 'CONFIRM',
+                                      Severity := TcEventSeverity.Error);
+
+        68:
+            // Press MESSAGE_CONFIRM_RECOVER
+            result := RaiseMessageBox(Header   := 'Confirm Recover Current Truss',
+                                      Message1 := 'Are you sure you want to recover current truss?',
+                                      Btn1     := 'GO BACK',
+                                      Btn5     := 'CONFIRM',
+                                      Severity := TcEventSeverity.Error);
+
+        69:
+            // Press MESSAGE_CONFIRM_SKIP_PLATE
+            result := RaiseMessageBox(Header   := 'Confirm Skip Current Plate',
+                                      Message1 := 'Are you sure you want to skip current plate?',
+                                      Btn1     := 'GO BACK',
+                                      Btn5     := 'CONFIRM',
+                                      Severity := TcEventSeverity.Error);
+
+        70:
+            // Press MESSAGE_CONFIRM_SKIP_PLATE
+
+            // Note: There's a bit of conflicting text in the original code.
+
+            // We'll unify it below.
+            result := RaiseMessageBox(Header   := 'Robot not moving home',
+                                      Message1 := 'Press robot is currently in the way of the carriages',
+                                      Message2 := 'Retry will double check world zone before moving forward',
+                                      Message3 := 'Make sure robot speed isnt too low.',
+                                      Btn5     := 'Retry',
+                                      Severity := TcEventSeverity.Error);
+
+    ELSE
+        // Not Valid Message Number
+
+        // The original code appends the ErrorNumber integer to the message.
+
+        // We'll keep the same logic, but we can store it as a separate or inline string.
+
+        // For demonstration, we directly pass in the integer, though we normally would do
+
+        // a conversion. We'll just label it as an unknown message.
+        result := RaiseMessageBox(Header   := 'Not Valid Message Number',
+                                  Message1 := CONCAT('UIMessageBox was sent message number: ', UINT_TO_STRING(Robot.Handshake.IN.MessageNumber)),
+                                  Message3 := 'Contact Support to update message number.',
+                                  Btn1     := 'EXIT MSG',
+                                  Severity := TcEventSeverity.Error);
+    END_CASE;
+
+    IF result <> 0 THEN
+        Robot.Handshake.OUT.MessageSolution    := result;
+        Robot.Handshake.OUT.MessageAcknowledge := TRUE;
+    END_IF
+ELSE
+    Robot.Handshake.OUT.MessageSolution    := 0;
+    Robot.Handshake.OUT.MessageAcknowledge := FALSE;
+END_IF;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

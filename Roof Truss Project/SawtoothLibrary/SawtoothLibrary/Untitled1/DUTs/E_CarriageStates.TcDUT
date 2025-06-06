@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_CarriageStates" Id="{84cb22de-06d5-45ab-a38b-fa1bf94052ca}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_CarriageStates : (
+        IDLE                              := 0,
+        HOLDING_BOARD                     := 1,
+        PICK                              := 2,
+        PICK_CONFIRM                      := 3,
+        PRESS_READY_FOR_BOARD             := 4,
+        PRESS_BOARD_IN_PLACE              := 5,
+        PRESS_BOARD_CLEAR_CHECK           := 6,
+        PRESS_NAILPLATE_DONE              := 7,
+        PRESS_NAILPLATE_DONE_CHECK        := 8,
+        NAILPLATE_DATA_CONFIRMATION       := 9,
+        PRESS_BOARD_CLEAR                 := 10,
+        DROPPING                          := 11,
+        DROP                              := 12,
+        DROP_CONFIRM                      := 13,
+        HOLD_BOARD_FOR_PICK               := 14,
+        GEAR_IN_MOVE                      := 15,
+        GEAR_IN_WAIT                      := 16,
+        GEARED_IN                         := 17,
+        NAILPLATE_POS_CALCULATION         := 18,
+        GEAR_OUT_WAIT                     := 19,
+        GEAR_OUT_HS                       := 20,
+        PRESS_MOVE_BOARD_TO_POSITION      := 21,
+        PICKING                           := 22,
+        MOVE_PREP                         := 23,
+        LENGTH_CHECK                      := 24,
+        CARRIAGE_RESUME_AFTER_WRONG_BOARD := 25,
+        RESET                             := 99
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

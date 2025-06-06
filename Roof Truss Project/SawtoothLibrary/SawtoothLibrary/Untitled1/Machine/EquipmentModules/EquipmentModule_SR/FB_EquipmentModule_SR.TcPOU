@@ -1,0 +1,2289 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_EquipmentModule_SR" Id="{29018835-5c20-4e29-a6d4-d2743e359e74}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_EquipmentModule_SR EXTENDS FB_PackML_BaseModule IMPLEMENTS I_EquipmentModule_SR
+VAR
+
+    EquipmentModule_Alarms : ARRAY[1..Global.MAX_ALARM_COUNT] OF FB_TcAlarm;
+
+    ipSubmodules_SR : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_EquipmentModule_SR := [];
+
+    //HMI Control for EM
+
+    fbControlSourceHMI : FB_ControlSource_HMI;
+
+    ErrorInput : BOOL;
+    WarnInput  : BOOL;
+    InfoInput  : BOOL;
+
+    //WaitSync varables
+
+    _ResponseWaitSync  : E_WaitSync;
+    _RequestedWaitSync : E_WaitSync;
+    _Handshake_State   : DINT;
+    _Step              : DINT;
+
+    //Iterator step
+
+    _CurrentStep  : DINT := 1;
+    _TaskState    : E_TaskState;
+    LastStepRan   : DINT; // Current step number
+    _StepToRun    : DINT := 1;
+    _InSimulation : BOOL;
+    _SafetyOK     : BOOL;
+    //Motor Resetting
+
+    _MotorHoming       : BOOL := TRUE;
+    _MotorsReset       : BOOL;
+    _MotorsInitialized : BOOL;
+    _MotorsHomed       : BOOL;
+    _MotorResetState   : DINT;
+    _MotorInitState    : DINT;
+    _MotorHomeState    : DINT;
+    _AlignNeeded       : BOOL;
+    _AlignGearInState  : DINT;
+
+    _RecoverBoardNum : DINT;
+
+    _EquipmentModuleID : E_EM_Index;
+
+    _CurrentCommandName : STRING;
+
+    _SubmodulesReset : BOOL;
+    _ComponentsReset : BOOL;
+    i                : UDINT;
+    j                : UDINT;
+    k                : UDINT;
+    ParseDone        : BOOL;
+
+    testbool   : BOOL;
+    testbool1  : BOOL;
+    testbool2  : BOOL;
+    testbool3  : BOOL;
+    testbool4  : BOOL;
+    testbool5  : BOOL;
+    testbool6  : BOOL;
+    testbool7  : BOOL;
+    testbool8  : BOOL;
+    testbool9  : BOOL;
+    testbool10 : BOOL;
+    testbool11 : BOOL;
+
+    testmessagebox1 : BOOL;
+    testmessagebox2 : BOOL;
+    testmessagebox3 : BOOL;
+
+    teststring : STRING;
+    testlreal  : LREAL;
+	tcMessage: Tc3_Database.I_TcMessage;
+	
+END_VAR
+
+VAR
+    MessageBox_Data     : ST_MessageBox_Data;
+    MessageBox_Response : ST_MessageBox_Response;
+
+    AutoUnsuspendCheck_TON : TON;
+    AutoUnsuspendReset_TON : TON;
+    AutoUnsuspendAvailable : BOOL;
+
+    _ForceHold : BOOL;
+
+	HMI_INPUT : ARRAY[1..20] OF BOOL;
+	HMI_OUTPUT : ARRAY[1..20] OF BOOL;
+	HMI_R_TRIG : ARRAY[1..50] OF R_TRIG;
+END_VAR
+
+VAR
+	//data logging
+    nState : INT;
+
+    //for generating timestamp
+    fbGetSystemTime1 : GetSystemTime;
+    dwTimeLoDW       : DWORD;
+    dwTimeHiDW       : DWORD;
+    tFileTime        : T_FILETIME;
+    nTimestamp       : LINT;
+
+    //for creating table
+    fbPLCDBCreate : FB_PLCDBCreateEvt(sNetID := '', tTimeout := T#5S);
+    aTblCfg       : ARRAY[0..3] OF ST_ColumnInfo;
+
+    //for insert samples
+    fbPLCDBCmd : FB_PLCDBCmdEvt(sNetID := '', tTimeout := T#19S);
+    aPara      : ARRAY[0..3] OF ST_ExpParameter;
+    sCmd1      : STRING(255);
+    sCmd2      : STRING(255);
+    sCmd       : STRING(512); //CONCAT of sCmd1 and sCmd2
+
+    //Data buffer
+    aWriteSQL : ARRAY[0..19] OF BOOL;
+    stData    : ARRAY[0..19, 0..99] OF ST_EquipmentModuleLog;
+
+    //buffer index
+    nWriteBufferIndex : INT := 0;
+    nWriteIndex       : INT := 0;
+    nSQLIndex         : INT := 0;
+
+    fbGetSystemTime : GETSYSTEMTIME;
+    fileTime        : T_FILETIME;
+    dtTime          : DATE_AND_TIME;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CommandStepParser" Id="{977f10b5-b884-4e8e-a5e7-748f52634a77}" />
+    <Folder Name="I_CyclicFB" Id="{fe85477a-7ac9-4513-b36e-66cb1de385c8}" />
+    <Folder Name="I_MachineComms" Id="{a8cafc93-081a-43ae-b299-6359dff8b2c3}" />
+    <Folder Name="Methods" Id="{cef43cb9-a8db-4a7c-9d87-f7bee9ff61bd}" />
+    <Folder Name="PackMLStates" Id="{3673af84-c475-4b70-951c-7aaec1781e36}">
+      <Folder Name="ActingStates" Id="{c3a99d01-6bac-443c-84e7-16a7ea42b191}" />
+      <Folder Name="WaitingStates" Id="{f84e41cd-960e-4e5a-b965-a0adc0031dba}" />
+    </Folder>
+    <Folder Name="Properties" Id="{ec61dab0-2312-4764-ab97-8d30831de0c5}" />
+    <Folder Name="ResetMethods" Id="{32609723-9488-4971-867d-6f758ce633ad}" />
+    <Folder Name="Simulation" Id="{5feebf87-44d1-412e-be86-ce0e4fcb3201}" />
+    <Method Name="AssemblyEndParse" Id="{c1af3fd4-a308-4caa-8fbe-83a57afcd5e9}" FolderPath="I_CommandStepParser\">
+      <Declaration><![CDATA[METHOD AssemblyEndParse : BOOL
+VAR_INPUT
+    Step          : ST_CSV_Step;
+    StepDetailOut : REFERENCE TO ST_AssemblyEnd;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[StepDetailOut.SeqID := Step.seqID;
+
+AssemblyEndParse := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AssemblyStartParse" Id="{19dd2ff0-6c53-430d-9ae9-d733b2b6d8c4}" FolderPath="I_CommandStepParser\">
+      <Declaration><![CDATA[METHOD AssemblyStartParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_AssemblyStart;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[StepOut.ComponentID := Step.Details[1].Datas[1];
+
+AssemblyStartParse := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AssignMessageBox" Id="{41ce21f8-2998-4edd-9b2a-5fcc0a33cc81}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD AssignMessageBox
+VAR_INPUT
+    MsgBox_Data     : REFERENCE TO ST_MessageBox_Data;
+    MsgBox_Response : REFERENCE TO ST_MessageBox_Response;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MsgBox_Data         := MessageBox_Data;
+MessageBox_Response := MsgBox_Response;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="BoardInfoParse" Id="{3e83037d-aa4a-4337-8760-c9e2fa7c4749}" FolderPath="I_CommandStepParser\">
+      <Declaration><![CDATA[METHOD BoardInfoParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_BoardInfo;
+END_VAR
+
+VAR
+    Detail          : ST_CSV_Detail;
+    conversionError : BOOL := FALSE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Ensure there's at least one detail in the step
+IF Step.DetailCount < 1 THEN
+    BoardInfoParse := FALSE;
+    RETURN;
+END_IF
+
+// Use the first detail
+Detail := Step.Details[1];
+
+// Check if the detail has enough data fields (we need at least 6 fields)
+IF Detail.DataCount < 6 THEN
+    BoardInfoParse := FALSE;
+    RETURN;
+END_IF
+
+// BoardID
+StepOut.BoardID := Detail.Datas[1];
+
+// BoardNumber
+StepOut.BoardNumber := STRING_TO_INT(Detail.Datas[2]);
+
+// BoardWidth
+StepOut.BoardWidth := STRING_TO_REAL(Detail.Datas[3]);
+
+// BoardHeight
+StepOut.BoardHeight := STRING_TO_REAL(Detail.Datas[4]);
+
+// BoardLength
+StepOut.BoardLength := STRING_TO_REAL(Detail.Datas[5]);
+
+// TotalPlates
+StepOut.TotalPlates := STRING_TO_INT(Detail.Datas[6]);
+
+BoardInfoParse := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="BoardParse" Id="{45ef7228-14aa-4823-8152-ed011a18f997}" FolderPath="I_CommandStepParser\">
+      <Declaration><![CDATA[METHOD BoardParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_Board;
+END_VAR
+
+// For simplicity, we'll use the first detail
+VAR
+    Detail : ST_CSV_Detail;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Ensure there's at least one detail in the step
+IF Step.DetailCount < 1 THEN
+    BoardParse := FALSE;
+    RETURN;
+END_IF
+
+Detail := Step.Details[1];
+
+// Check if the detail has enough data fields
+IF Detail.DataCount < 7 THEN
+    BoardParse := FALSE;
+    RETURN;
+END_IF
+
+// BoardID
+StepOut.BoardID := Detail.Datas[1];
+
+// BoardWidth
+StepOut.BoardWidth := STRING_TO_REAL(Detail.Datas[2]);
+
+// BoardHeight
+StepOut.BoardHeight := STRING_TO_REAL(Detail.Datas[3]);
+
+// BoardLength
+StepOut.BoardLength := STRING_TO_REAL(Detail.Datas[4]);
+
+// BoardNumber
+StepOut.BoardNumber := STRING_TO_INT(Detail.Datas[5]);
+
+// LeadingEdgeBevelOffset
+StepOut.LeadingEdgeBevelOffset := STRING_TO_REAL(Detail.Datas[6]);
+
+// TrailingEdgeBevelOffset
+StepOut.TrailingEdgeBevelOffset := STRING_TO_REAL(Detail.Datas[7]);
+
+BoardParse := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ClearAlarms" Id="{86224ff0-e47f-4f7b-9726-fec954f3ecdf}" FolderPath="ResetMethods\">
+      <Declaration><![CDATA[METHOD ClearAlarms
+VAR_INPUT
+    MyAlarms : ARRAY[1..Global.MAX_ALARM_COUNT] OF FB_TcAlarm;
+END_VAR
+
+VAR
+    i : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO Global.MAX_ALARM_COUNT DO
+    MyAlarms[i].Clear(0, 0);
+END_FOR;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ComponentMonitor" Id="{8c4bb99b-0368-4aaa-9f4f-d3b98ad79227}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary This method monitors <b>components</b> within this PackML module and initiates fault responses as required
+METHOD PROTECTED ComponentMonitor : BOOL
+VAR
+    AlarmResponses : ARRAY[0..4] OF E_AlarmResponse; //Temporary response array
+    i              : UDINT;
+END_VAR
+
+//! @description This method is called cyclically by <c>CyclicLogic()</c>
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO NumberOfComponents DO
+    IF _CurrentState <> E_PMLState.ePMLState_Aborted AND
+       _CurrentState <> E_PMLState.ePMLState_Aborting AND
+       _CurrentState <> E_PMLState.ePMLState_Clearing AND
+       _CurrentState <> E_PMLState.ePMLState_Suspended AND
+       _CurrentState <> E_PMLState.ePMLState_Unsuspending AND
+       _CurrentState <> E_PMLState.ePMLState_Held AND
+       _CurrentState <> E_PMLState.ePMLState_Unholding AND
+       _CurrentState <> E_PMLState.ePMLState_Stopped AND
+       _CurrentState <> E_PMLState.ePMLState_Stopping THEN
+        AlarmResponses := ipComponents[i].ParentResponseDefinitions;
+
+        CASE AlarmResponses[ipComponents[i].CurrentAlarmSeverity] OF
+            E_AlarmResponse.Abort_ImmediateError:
+                SuspendImmediate();
+
+            E_AlarmResponse.Abort_Immediate:
+                SuspendControlled();
+
+            E_AlarmResponse.Stop_Immediate:
+                StopImmediate();
+
+            E_AlarmResponse.Stop_Controlled:
+                StopControlled();
+
+            E_AlarmResponse.Hold_Immediate:
+                HoldImmediate();
+
+            E_AlarmResponse.Hold_Controlled:
+                HoldControlled();
+
+            E_AlarmResponse.Suspend_Immediate:
+                SuspendImmediate();
+
+            E_AlarmResponse.Suspend_Controlled:
+                SuspendControlled();
+
+            E_AlarmResponse.NoResponse:
+                ;
+        END_CASE
+    ELSIF _CurrentState = E_PMLState.ePMLState_Stopped OR _CurrentState = E_PMLState.ePMLState_Stopping THEN
+        AlarmResponses := ipComponents[i].ParentResponseDefinitions;
+
+        CASE AlarmResponses[ipComponents[i].CurrentAlarmSeverity] OF
+            E_AlarmResponse.Abort_ImmediateError:
+                AbortImmediateError(ipComponents[i].Name, FALSE);
+
+            E_AlarmResponse.Abort_Immediate:
+                AbortImmediate();
+
+            E_AlarmResponse.NoResponse:
+                ;
+        END_CASE
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="CurrentStep" Id="{5829d1e6-976a-4c9d-bfd2-aecebfb18755}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY CurrentStep : DINT]]></Declaration>
+      <Get Name="Get" Id="{63c631f0-d15c-4197-a594-0daa4f24def1}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[CurrentStep := _CurrentStep;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{72e8939a-97ee-4af2-a7b2-371a7db5531b}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_CurrentStep := CurrentStep;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="CyclicLogic" Id="{7377c032-541c-4978-a12e-723345b45fe9}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+METHOD PUBLIC CyclicLogic
+VAR
+    i : UDINT;
+END_VAR
+
+VAR_INST
+    test_header   : STRING          := 'Header';
+    test_header2  : STRING          := 'Header';
+    test_header3  : STRING          := 'Header';
+    test_message1 : STRING          := 'message 1';
+    test_message2 : STRING          := 'message 2 ';
+    test_message3 : STRING          := 'message 3';
+    test_message4 : STRING          := 'message 4';
+    test_message5 : STRING          := 'message 5';
+    test_message6 : STRING          := 'message 6';
+    test_message7 : STRING          := 'message 7';
+    test_btn1     : STRING          := 'Btn 1';
+    test_btn2     : STRING          := 'Btn 2';
+    test_btn3     : STRING          := 'Btn 3';
+    test_btn4     : STRING          := 'Btn 4';
+    test_btn5     : STRING          := 'Btn 5';
+    test_severity : TcEventSeverity := 1;
+    test_icon     : USINT           := 1;
+    result        : USINT;
+
+    MsgBox_R_TRIG : R_TRIG;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//HMI control for EM
+
+fbControlSourceHMI.CyclicLogic();
+MessageBox_Data.ErrorPresent := FALSE;
+
+SUPER^.CyclicLogic();
+MessageBox_Data.Equipment_Module        := _EquipmentModuleID;
+MessageBox_Data.Equipment_Module_String := THIS^._Name;
+test_header                             := CONCAT(THIS^._Name, ' -> header');
+test_header                             := CONCAT(test_header, ' MsgBox1');
+test_header2                            := CONCAT(test_header, ' MsgBox2');
+// test_header3                            := CONCAT(test_header, ' MsgBox3');
+
+MsgBox_R_TRIG(CLK := Global.testmessagebox);
+
+IF MsgBox_R_TRIG.Q THEN
+    testmessagebox2 := TRUE;
+END_IF
+
+IF testmessagebox2 OR MsgBox_R_TRIG.Q THEN
+    result := RaiseMessageBox(Header   := test_header2,
+                              Message1 := test_message1,
+                              Message2 := test_message2,
+                              Message3 := test_message3,
+                              Message4 := test_message4,
+                              Message5 := test_message5,
+                              Message6 := test_message6,
+                              Message7 := test_message7,
+                              Btn1     := test_btn1,
+                              Btn2     := test_btn2,
+                              Btn3     := test_btn3,
+                              Btn4     := test_btn4,
+                              Btn5     := test_btn5,
+                              Severity := test_severity,
+                              Icon     := test_icon);
+
+    IF result > 0 THEN
+        testmessagebox2 := FALSE;
+    END_IF
+END_IF
+
+IF _CurrentState = E_PMLState.ePMLState_Suspended THEN
+    AutoUnsuspendCheck_TON(IN := TRUE, PT := T#500MS);
+    AutoUnsuspendReset_TON(IN := FALSE, PT := T#5S);
+ELSIF _CurrentState = E_PMLState.ePMLState_Execute THEN
+    AutoUnsuspendCheck_TON(IN := FALSE, PT := T#500MS);
+    AutoUnsuspendReset_TON(IN := TRUE, PT := T#5S);
+
+    IF AutoUnsuspendReset_TON.Q THEN
+        AutoUnsuspendAvailable := TRUE;
+    END_IF
+END_IF
+
+IF _CurrentState = E_PMLState.ePMLState_Held OR
+   _CurrentState = E_PMLState.ePMLState_Suspended OR
+   _CurrentState = E_PMLState.ePMLState_Idle OR
+   _CurrentState = E_PMLState.ePMLState_stopped OR
+   _CurrentState = E_PMLState.ePMLState_Aborted THEN
+    HMIControl();
+END_IF
+
+IF testbool5 THEN
+    teststring := LengthFormatString(testlreal);
+    testbool5  := FALSE;
+END_IF
+
+SubModuleMonitor();
+ComponentMonitor();
+EM_BufferLogging(sNetID := '', nDBID := 2, bRecord := testbool9);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogicSimulation" Id="{0f58318b-1896-4539-8f18-d61e39d73fd3}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogicSimulation : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// AllowHMIControl(ThisModuleOnly:=FALSE); //Allow control for recovery
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="EM_BufferLogging" Id="{49fb67d1-2f45-43bf-8e76-9fd49c146af3}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD EM_BufferLogging
+VAR_INPUT
+    sNetID  : T_AmsNetID;
+    nDBID   : UDINT;
+    bRecord : BOOL;
+END_VAR
+
+VAR_OUTPUT
+    bTableCreated : BOOL;
+    bRecording    : BOOL;
+    bError        : BOOL;
+    sTableName    : T_MaxString;
+    nRecords      : ULINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//Create timestamp
+fbGetSystemTime1(timeLoDW => dwTimeLoDW, timeHiDW => dwTimeHiDW);
+tFileTime.dwLowDateTime  := dwTimeLoDW;
+tFileTime.dwHighDateTime := dwTimeHiDW;
+MEMCPY(ADR(nTimestamp), ADR(tFileTime), 8);
+
+CASE nState OF
+    0: //Init
+
+        IF bRecord THEN
+            bError        := FALSE;
+            bTableCreated := FALSE;
+            bRecording    := FALSE;
+            nRecords      := 0;
+
+            sTableName := 'em_log';
+
+            sCmd1 := CONCAT('INSERT INTO ', sTableName);
+			
+            sCmd2 := ' (timestamp,module,state,msg) VALUES({Timestamp},{ModuleName},{PackMLState},{Message});';
+
+            CONCAT2(ADR(sCmd1), ADR(sCmd2), ADR(sCmd), SIZEOF(sCmd));
+
+            nWriteBufferIndex := 0;
+            nWriteIndex       := 0;
+            nSQLIndex         := 0;
+
+            nState := 2;
+        END_IF
+
+    2: //Recording		
+        bRecording := TRUE;
+
+        fbGetSystemTime(timeLoDW => fileTime.dwLowDateTime, timeHiDW => fileTime.dwHighDateTime);
+        dtTime := FILETIME_TO_DT(fileTime);
+
+		aPara[0].eParaType := E_ExpParameterType.DateTime;
+		aPara[0].nParaSize := 4;
+		aPara[0].sParaName := 'timestamp';
+
+		aPara[1].eParaType := E_ExpParameterType.STRING_;
+		aPara[1].nParaSize := 33;
+		aPara[1].sParaName := 'module';
+
+		aPara[2].eParaType := E_ExpParameterType.STRING_;
+		aPara[2].nParaSize := 33;
+		aPara[2].sParaName := 'state';
+
+		aPara[3].eParaType := E_ExpParameterType.STRING_;
+		aPara[3].nParaSize := 256;
+		aPara[3].sParaName := 'msg';
+
+        //Fill buffer
+        stData[nWriteBufferIndex, nWriteIndex].Timestamp   := dtTime;
+        stData[nWriteBufferIndex, nWriteIndex].ModuleName  := THIS^.Name;
+        stData[nWriteBufferIndex, nWriteIndex].PackMLState := TO_STRING(_CurrentState);
+        stData[nWriteBufferIndex, nWriteIndex].Message     := CONCAT(INT_TO_STRING(nWriteBufferIndex), CONCAT(':  ', INT_TO_STRING(nWriteIndex)));
+
+        //Set buffer index
+        nWriteIndex := nWriteIndex + 1;
+
+        IF nWriteIndex = 100 THEN
+            nWriteIndex                  := 0;
+            aWriteSQL[nWriteBufferIndex] := TRUE;
+            nWriteBufferIndex            := nWriteBufferIndex + 1;
+
+            IF nWriteBufferIndex = 20 THEN
+                nWriteBufferIndex := 0;
+            END_IF
+
+            IF aWriteSQL[nWriteBufferIndex] THEN
+                nState := 255;
+                RETURN;
+            END_IF
+        END_IF
+
+        //Write buffer element (100 samples) to database
+        IF aWriteSQL[nSQLIndex] THEN
+            IF fbPLCDBCmd.Execute(nDBID,
+                                  ADR(sCmd),
+                                  SIZEOF(sCmd),
+                                  ADR(stData[nSQLIndex, 0]),
+                                  SIZEOF(stData[nSQLIndex, 0]) * 100,
+                                  ADR(aPara),
+                                  SIZEOF(aPara)) THEN
+                IF fbPLCDBCmd.bError THEN
+					tcMessage := fbPLCDBCmd.ipTcResult;
+                    nState := 255;
+                ELSE
+                    nRecords := nRecords + 100;
+
+                    aWriteSQL[nSQLIndex] := FALSE;
+
+                    nSQLIndex := nSQLIndex + 1;
+
+                    IF nSQLIndex = 20 THEN
+                        nSQLIndex := 0;
+                    END_IF
+
+                    IF NOT bRecord THEN
+                        bRecording := FALSE;
+                        nState     := 0;
+                    END_IF
+                END_IF
+            END_IF
+        END_IF
+
+    255: //Error
+        bError     := TRUE;
+        bRecording := FALSE;
+
+        IF NOT bRecord THEN
+            nState := 0;
+        END_IF
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="EquipmentModuleID" Id="{ed6d3582-6ee6-4c16-be2d-b3c2e786e4ab}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY EquipmentModuleID : E_EM_Index;]]></Declaration>
+      <Get Name="Get" Id="{8f4ae7d6-6d42-4a61-bbc0-ba1bacb500e2}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[EquipmentModuleID := _EquipmentModuleID;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{965d8986-9e68-45b5-b788-2bff0823a443}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_EquipmentModuleID := EquipmentModuleID;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Execute" Id="{7c1438ac-e310-4dad-8c16-e999282bb656}" FolderPath="PackMLStates\WaitingStates\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+METHOD PROTECTED Execute
+VAR
+    i : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_MotorsReset := FALSE;
+
+_MotorInitState := 0;
+
+_ComponentsReset := FALSE;
+
+// IF Global.AutoMode THEN
+
+//     AutoSpeeds();
+
+// ELSE
+
+//     ManualSpeeds();
+
+// END_IF
+
+CASE _CurrentMode OF
+    //=================================PRODUCTION MODE==================================
+    E_PMLUnitMode.ePMLUnitMode_Production:
+        ;
+
+        //=================================MAINTENANCE MODE==================================	
+    E_PMLUnitMode.ePMLUnitMode_Maintenance:
+        ;
+
+        //=================================MANUAL MODE==================================
+    E_PMLUnitMode.ePMLUnitMode_Manual:
+        ;
+
+    E_PMLUnitMode.ePMLUnitMode_UserMode1:
+        ;
+
+END_CASE
+
+// _MotorsInitialized := FALSE;
+
+// _MotorsReset := FALSE;
+
+SUPER^.Execute();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ForceHold" Id="{caaddb03-06f2-4d0e-ac2c-4fa158eb8560}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ForceHold : Bool]]></Declaration>
+      <Get Name="Get" Id="{4733525b-5fde-4cde-b1c3-c783233d3072}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ForceHold := _ForceHold;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{b731d0bc-7511-4efe-918c-892222e4bab4}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ForceHold := ForceHold;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="HMIControl" Id="{5100709e-1727-4398-9e95-e6b41629f97d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Holding" Id="{02ecf666-371b-4378-b767-70b5a5739041}" FolderPath="PackMLStates\ActingStates\">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Holding</b> state
+METHOD PROTECTED Holding
+VAR
+    i               : UDINT;
+    SubModulesReady : BOOL := TRUE;
+END_VAR
+
+(*! <description><b>Note:</b> The <i>Hold</i> command is intended to be given by an operator. It is meant to be distinct from a <i>Suspend</i> in that upstream/downstream jams, etc. should be handled automatically using <i>Suspend</i>.  Both <i>Hold</i>and<i>Suspend</i> result in a <i>paused</i> state which should allow resumption of the <b>Execute</b> state. 
+<table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> Execute </td>
+		<td> Hold Command </td> 
+		<td> State Complete </td>
+		<td> Held </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_MotorsReset      := FALSE;
+_MotorInitState   := 0;
+_ComponentsReset  := FALSE;
+_AlignGearInState := 0;
+_Handshake_State  := 0;
+
+SUPER^.Holding();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Idle" Id="{a00d2c37-ad36-4234-8cea-2493381d4ff6}" FolderPath="PackMLStates\WaitingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Idle
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// ParseDone := FALSE;
+
+// _MotorsReset := FALSE;
+
+// _MotorInitState := 0;
+
+// _ComponentsReset := FALSE;
+
+// _AlignGearInState := 0;
+
+// _Handshake_State := 0;
+
+// 
+
+// _CommandStates.Assembly_End_State := 0;
+
+// _CommandStates.Assembly_Start_State := 0;
+
+// _CommandStates.Generic_State := 0;
+
+// _CommandStates.Nail_Lamination_State := 0;
+
+// _CommandStates.Plate_State := 0;
+
+// _CommandStates.SE_State := 0;
+
+// _CommandStates.SENail_State := 0;
+
+// _CommandStates.Stud_State := 0;
+
+// _CommandStates.StudInfo_State := 0;
+
+// _CommandStates.Wall_Info_State := 0;
+
+// _CommandStates.MoveAborted := FALSE;
+
+// _CommandStates.Last_Move_State := 0;
+
+// _ExtractState := 0;
+
+SUPER^.Idle();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IndexConveyorParse" Id="{63cdda82-dc7f-40b1-b380-5852393b8e6c}" FolderPath="I_CommandStepParser\">
+      <Declaration><![CDATA[METHOD IndexConveyorParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_IndexConveyor;
+END_VAR
+
+VAR
+    Detail          : ST_CSV_Detail;
+    conversionError : BOOL := FALSE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Ensure there's at least one detail in the step
+IF Step.DetailCount < 1 THEN
+    IndexConveyorParse := FALSE;
+    RETURN;
+END_IF
+
+// Use the first detail
+Detail := Step.Details[1];
+
+// Check if the detail has enough data fields (we need at least 6 fields)
+IF Detail.DataCount < 1 THEN
+    IndexConveyorParse := FALSE;
+    RETURN;
+END_IF
+
+// BoardID
+StepOut.ConvIndex := STRING_TO_INT(Detail.Datas[1]);
+
+IndexConveyorParse := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="InSimulation" Id="{479b9a8a-a376-4522-a6dd-6878689ed881}" FolderPath="Simulation\">
+      <Declaration><![CDATA[PROPERTY InSimulation : BOOL]]></Declaration>
+      <Set Name="Set" Id="{287cc172-643f-4bab-bb46-d72722ff0d6d}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_InSimulation := InSimulation;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="LengthFormatString" Id="{fb3b596a-085e-4e86-9a8d-5884632dd7df}" FolderPath="Methods\">
+      <Declaration><![CDATA[(*
+	This method takes an input of LREAL length in mm and converts it to a string of the board print format of FT:IN:16th
+*)
+METHOD LengthFormatString : STRING
+VAR_INPUT
+    BoardLength : LREAL;
+END_VAR
+
+VAR
+    temp_lreal  : LREAL;
+    temp_in     : LREAL;
+    temp_in_dec : LREAL;
+    temp_ft     : LREAL;
+    temp_16     : LREAL;
+    tempstring  : STRING;
+    ft          : LREAL;
+    in          : LREAL;
+    sixteenth   : LREAL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[temp_ft     := BoardLength / 25.4 / 12;
+ft          := TRUNC(temp_ft);
+temp_in_dec := temp_ft - ft;
+temp_in     := temp_in_dec * 12;
+in          := TRUNC(temp_in);
+temp_16     := temp_in - in;
+sixteenth   := TRUNC((temp_16 * 16) + 0.5);
+
+IF sixteenth = 16 THEN
+    in        := in + 1;
+    sixteenth := 0;
+END_IF
+
+IF in = 12 THEN
+    ft := ft + 1;
+    in := 0;
+END_IF
+
+LengthFormatString := concat(USINT_TO_STRING(LREAL_TO_USINT(ft)),
+                             Concat(':', CONCAT(USINT_TO_STRING(LREAL_TO_USINT(in)), CONCAT(':', USINT_TO_STRING(LREAL_TO_USINT(sixteenth))))));]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MotorResetAndEnable" Id="{4f6540a1-f724-477b-ba38-c60d08baf2fa}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD MotorResetAndEnable : BOOL
+VAR_INPUT
+    Motor : REFERENCE TO FB_Component_BasicSlaveAxis;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MotorResetAndEnable := FALSE;
+
+IF Motor.Error THEN
+    Motor.Reset();
+ELSE
+
+    Motor.Enable();
+
+    IF Motor.Enabled THEN
+        MotorResetAndEnable := TRUE;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MotorsHome" Id="{0700ff80-16fc-4efc-9eaa-f0f3bce1e3d1}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD MotorsHome : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MotorsHome := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MotorsInit" Id="{0335b310-8ca4-453c-b6bf-14665fd61f72}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD MotorsInit : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MotorsInit := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MotorsInitAlignGearIn" Id="{fb5ccd9e-6f2a-4532-b38e-3e745df0b7a2}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD MotorsInitAlignGearIn : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MotorsInitAlignGearIn := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="NailPlateParse" Id="{ab6ce534-63b4-47da-a44d-25ce4a991a8a}" FolderPath="I_CommandStepParser\">
+      <Declaration><![CDATA[METHOD NailPlateParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_Plates;
+END_VAR
+
+VAR
+    DetailIndex     : INT;
+    conversionError : BOOL;
+    Detail          : ST_CSV_Detail;
+    PlateIndex      : INT;
+    TempWidth       : REAL;
+    TempHeight      : REAL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Ensure there's at least one detail in the step
+
+IF Step.DetailCount < 1 THEN
+    NailPlateParse := FALSE;
+    RETURN;
+END_IF
+
+FOR i := 1 TO Step.DetailCount DO
+    Detail := Step.Details[i];
+
+    // Ensure the detail has enough data fields
+
+    IF Detail.DataCount < 11 THEN
+        conversionError := TRUE;
+        EXIT; // Exit the loop on error
+    END_IF;
+
+    // BoardID
+
+    StepOut.Plates[i].BoardID := Detail.Datas[1];
+
+    // PlateID
+
+    StepOut.Plates[i].PlateID := Detail.Datas[2];
+
+    // PlateNumber
+
+    StepOut.Plates[i].PlateNumber := STRING_TO_INT(Detail.Datas[3]);
+
+    // PlateDimensions
+
+    StepOut.Plates[i].PlateDimensions := Detail.Datas[4];
+
+    // PlateGauge
+
+    StepOut.Plates[i].PlateGauge := Detail.Datas[5];
+
+    TempWidth  := STRING_TO_REAL(Detail.Datas[6]);
+    TempHeight := STRING_TO_REAL(Detail.Datas[7]);
+    // PlateWidth
+
+    StepOut.Plates[i].PlateWidth := MIN(TempWidth, TempHeight);
+
+    // PlateHeight
+
+    StepOut.Plates[i].PlateHeight := MAX(TempWidth, TempHeight);
+
+    // PlatePlaceX
+
+    StepOut.Plates[i].PlatePlaceX := STRING_TO_REAL(Detail.Datas[8]);
+
+    // PlatePlaceY
+
+    StepOut.Plates[i].PlatePlaceY := STRING_TO_REAL(Detail.Datas[9]);
+
+    // PlatePlaceAngle
+
+    StepOut.Plates[i].PlatePlaceAngle := STRING_TO_REAL(Detail.Datas[10]);
+
+    IF TempWidth > TempHeight THEN
+        //         StepOut.Plates[i].PlatePlaceAngle := StepOut.Plates[i].PlatePlaceAngle + 90;
+        Trace('Width and Height for nailplate swapped');
+    END_IF
+
+    // If the value is negative, add 360
+
+    IF StepOut.Plates[i].PlatePlaceAngle < 0 THEN
+        StepOut.Plates[i].PlatePlaceAngle := StepOut.Plates[i].PlatePlaceAngle + 360;
+    END_IF;
+
+    // TopOrBottom
+
+    StepOut.Plates[i].TopOrBottom := Detail.Datas[11];
+
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ParentResponseDefinitions" Id="{f96f2734-1f60-4eb7-a5ef-4a7f4d486829}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ParentResponseDefinitions : ARRAY[0..4] OF E_AlarmResponse]]></Declaration>
+      <Get Name="Get" Id="{aaddf848-c632-4d89-9a42-abc604ff7b64}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ParentResponseDefinitions[TcEventSeverity.Verbose]  := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Info]     := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Warning]  := E_AlarmResponse.NoResponse;
+ParentResponseDefinitions[TcEventSeverity.Error]    := E_AlarmResponse.Suspend_Controlled;
+ParentResponseDefinitions[TcEventSeverity.Critical] := E_AlarmResponse.Suspend_Immediate;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="PickPlaceParse" Id="{66c5d8ad-330f-4941-8c02-64df62a52329}" FolderPath="I_CommandStepParser\">
+      <Declaration><![CDATA[METHOD PickPlaceParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_PickPlace;
+END_VAR
+
+VAR
+    DetailIndex     : INT;
+    conversionError : BOOL;
+    Detail          : ST_CSV_Detail;
+    PlateIndex      : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Ensure there's at least one detail in the step
+IF Step.DetailCount < 1 THEN
+    PickPlaceParse := FALSE;
+    RETURN;
+END_IF
+
+// Ensure the detail has enough data fields
+IF Step.Details[1].DataCount < 5 OR Step.Details[2].DataCount < 5 THEN
+    conversionError := TRUE;
+    PickPlaceParse  := FALSE;
+    RETURN; // Exit the loop on error
+END_IF;
+
+StepOut.ID        := Step.Details[1].Datas[1];
+StepOut.Number    := STRING_TO_INT(Step.Details[1].Datas[2]);
+StepOut.Length    := STRING_TO_REAL(Step.Details[1].Datas[3]);
+StepOut.Width     := STRING_TO_REAL(Step.Details[1].Datas[4]);
+StepOut.boardType := Step.Details[1].Datas[5];
+
+StepOut.XPos      := STRING_TO_REAL(Step.Details[2].Datas[1]);
+StepOut.YPos      := STRING_TO_REAL(Step.Details[2].Datas[2]);
+StepOut.ZPos      := STRING_TO_REAL(Step.Details[2].Datas[3]);
+StepOut.ZRot      := STRING_TO_REAL(Step.Details[2].Datas[4]);
+StepOut.ConvIndex := STRING_TO_INT(Step.Details[2].Datas[5]);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RaiseAlarm2Args" Id="{2a8fb619-593a-465a-824f-fad87caef57d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD RaiseAlarm2Args
+VAR_IN_OUT
+    fbAlarm : FB_TcAlarm; //Alarm to be raised
+END_VAR
+
+VAR_INPUT
+    String_1 : STRING; //First String Parameter (The Name of this component will be applied first automatically)
+    String_2 : STRING; //Second String Parameter
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_RaiseAlarmWithStringParameters(Alarm := fbAlarm, String_1 := Name, String_2 := String_1, String_3 := String_2);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RaiseMessageBox" Id="{eac13af4-e544-4ce8-9e07-882229fc2761}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD RaiseMessageBox : USINT
+VAR_INPUT
+    Header   : STRING;
+    Message1 : STRING;
+    Message2 : STRING          := '';
+    Message3 : STRING          := '';
+    Message4 : STRING          := '';
+    Message5 : STRING          := '';
+    Message6 : STRING          := '';
+    Message7 : STRING          := '';
+    Btn1     : STRING          := '';
+    Btn2     : STRING          := '';
+    Btn3     : STRING          := '';
+    Btn4     : STRING          := '';
+    Btn5     : STRING          := '';
+    Severity : TcEventSeverity := TcEventSeverity.Info;
+    Icon     : USINT           := 1;
+END_VAR
+
+VAR_INST
+    TimeStampTrig : R_TRIG;
+    MsgBox_Raised : BOOL;
+END_VAR
+
+VAR
+    fbGetSystemTime : GETSYSTEMTIME;
+    fileTime        : T_FILETIME;
+    tempDT          : DT;
+    tempTOD         : TOD;
+    tempTODString   : STRING;
+    sTime           : STRING;
+    ResponseString  : STRING;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[RaiseMessageBox := 0;
+fbGetSystemTime(timeLoDW => fileTime.dwLowDateTime, timeHiDW => fileTime.dwHighDateTime);
+
+IF MessageBox_Response.ErrorAcknowledge = TRUE AND MessageBox_Response.ErrorSolution > 0 AND MessageBox_Data.Header = Header THEN
+    RaiseMessageBox := MessageBox_Response.ErrorSolution;
+
+    CASE RaiseMessageBox OF
+        1:
+            ResponseString := Btn1;
+
+        2:
+            ResponseString := Btn2;
+
+        3:
+            ResponseString := Btn3;
+
+        4:
+            ResponseString := Btn4;
+
+        5:
+            ResponseString := Btn5;
+    END_CASE
+
+    Trace(CONCAT('Msg Cleared: ', CONCAT(Header, CONCAT('; Response: ', ResponseString))));
+    ResetMessageBox();
+    TimeStampTrig(CLK := FALSE);
+ELSE
+    IF Header <> '' AND
+       Message1 <> '' AND
+       (Btn1 <> '' OR Btn2 <> '' OR Btn3 <> '' OR Btn4 <> '' OR Btn5 <> '') AND
+       (MessageBox_Response.ErrorRaised = FALSE OR MessageBox_Data.Header = Header) THEN
+        TimeStampTrig(CLK := TRUE);
+        MessageBox_Data.Header := Header;
+
+        IF TimeStampTrig.Q THEN
+            tempDT                    := SYSTEMTIME_TO_DT(FILETIME_TO_SYSTEMTIME(fileTime));
+            tempTOD                   := DT_TO_TOD(tempDT);
+            tempTODString             := TOD_TO_STRING(tempTOD);
+            MessageBox_Data.TimeStamp := REPLACE(tempTODString, '', 1, 4);
+            Trace(CONCAT('Msg Raised: ', Header));
+        END_IF
+
+        MessageBox_Data.Icon := Icon;
+
+        MessageBox_Data.Messages.Message1 := Message1;
+        MessageBox_Data.Messages.Message2 := Message2;
+        MessageBox_Data.Messages.Message3 := Message3;
+        MessageBox_Data.Messages.Message4 := Message4;
+        MessageBox_Data.Messages.Message5 := Message5;
+        MessageBox_Data.Messages.Message6 := Message6;
+        MessageBox_Data.Messages.Message7 := Message7;
+
+        MessageBox_Data.Buttons.Button1.Text := Btn1;
+        MessageBox_Data.Buttons.Button2.Text := Btn2;
+        MessageBox_Data.Buttons.Button3.Text := Btn3;
+        MessageBox_Data.Buttons.Button4.Text := Btn4;
+        MessageBox_Data.Buttons.Button5.Text := Btn5;
+
+        IF MessageBox_Data.Buttons.Button1.Text <> '' THEN
+            MessageBox_Data.Buttons.Button1.Visible := TRUE;
+        ELSE
+            MessageBox_Data.Buttons.Button1.Visible := FALSE;
+        END_IF
+
+        IF MessageBox_Data.Buttons.Button2.Text <> '' THEN
+            MessageBox_Data.Buttons.Button2.Visible := TRUE;
+        ELSE
+            MessageBox_Data.Buttons.Button2.Visible := FALSE;
+        END_IF
+
+        IF MessageBox_Data.Buttons.Button3.Text <> '' THEN
+            MessageBox_Data.Buttons.Button3.Visible := TRUE;
+        ELSE
+            MessageBox_Data.Buttons.Button3.Visible := FALSE;
+        END_IF
+
+        IF MessageBox_Data.Buttons.Button4.Text <> '' THEN
+            MessageBox_Data.Buttons.Button4.Visible := TRUE;
+        ELSE
+            MessageBox_Data.Buttons.Button4.Visible := FALSE;
+        END_IF
+
+        IF MessageBox_Data.Buttons.Button5.Text <> '' THEN
+            MessageBox_Data.Buttons.Button5.Visible := TRUE;
+        ELSE
+            MessageBox_Data.Buttons.Button5.Visible := FALSE;
+        END_IF
+
+        MessageBox_Data.Severity := Severity;
+
+        MessageBox_Data.ErrorPresent := TRUE;
+    ELSE
+        //can't raise message with no header, message, or at least one button to clear message. 
+    END_IF
+
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="RecoverBoardNum" Id="{0965195d-be54-4fbc-88f6-d55c20f9e028}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY RecoverBoardNum : DINT]]></Declaration>
+      <Set Name="Set" Id="{a9d1c9c5-1c6d-417b-b9ea-b441d7a86541}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_RecoverBoardNum := RecoverBoardNum;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="RegisterSubmodules" Id="{27fa0282-059a-43fc-937e-c90c1c3a25ef}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED RegisterSubmodules
+VAR_INPUT
+    SubModule : I_EquipmentModule_SR;
+END_VAR
+
+VAR
+    i       : UDINT;
+    PLCStop : PLC_Stop;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete AND (SubModule <> 0) THEN
+    FOR i := 1 TO SPT_BaseTypes.Parameters_PackML_Base.MAX_NO_OF_SUBMODULES DO
+        IF ipSubModules_SR[i] = SubModule THEN
+            //Submodule already registered
+            RETURN;
+        END_IF
+    END_FOR
+
+    FOR i := 1 TO SPT_BaseTypes.Parameters_PackML_Base.MAX_NO_OF_SUBMODULES DO
+        IF ipSubModules_SR[i] = 0 THEN
+            ipSubModules_SR[i] := SubModule;
+            ipSubModules[i]    := SubModule;
+            RETURN;
+        END_IF
+    END_FOR
+
+    //If we get here then we are exceeding the array bounds
+    Trace(CONCAT('***CRITICAL - Failed to register SubModule!!  (', CONCAT(SubModule.Name, ')***')));
+    PLCStop(STOP := TRUE);
+
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ResetComponents" Id="{c46a8c2a-c1ae-423a-9811-557f77a37766}" FolderPath="ResetMethods\">
+      <Declaration><![CDATA[METHOD ResetComponents : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ResetComponents := TRUE;
+
+FOR i := 1 TO NumberOfComponents DO
+    ResetComponents := ipComponents[i].Reset() AND ResetComponents;
+END_FOR
+
+IF ResetComponents THEN
+    _Error   := FALSE;
+    _ErrorID := 0;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ResetMessageBox" Id="{83ad9c32-5609-4135-a80d-cccbb4c257c2}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ResetMessageBox
+VAR_INPUT
+END_VAR
+
+VAR
+    EmptyMessageBox : ST_MessageBox_Data;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MessageBox_Data := EmptyMessageBox;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ResetOnResume" Id="{0040538d-4512-44af-99ae-d3c66e28ee82}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ResetOnResume : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF ResetComponents() THEN
+    _ComponentsReset := TRUE;
+END_IF
+
+IF _ComponentsReset THEN
+    ClearAlarms(EquipmentModule_Alarms);
+    ResetOnResume := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Resetting" Id="{ab8a4845-dcd2-4fb6-b4b0-9b5b60456606}" FolderPath="PackMLStates\ActingStates\">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Resetting</b> state
+METHOD PROTECTED Resetting
+VAR
+    i               : UDINT;
+    SubModulesReady : BOOL := TRUE;
+END_VAR
+
+(*! <description> <b>Note:</b> The <i>Reset</i> command can also be thought of as an <i>enable</i> depite the ambiguity in the naming of the <i>Clearing</i> state.
+<table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> Stopped<b>-or-</b>Completed </td>
+		<td> Reset Command </td> 
+		<td> State Complete </td>
+		<td> Idle </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE _MotorInitState OF
+    0:
+        IF _ComponentsReset = FALSE THEN
+            _ComponentsReset := ResetOnResume();
+        ELSE
+            _MotorInitState := 1;
+        END_IF
+
+    1:
+        IF _MotorsHomed = FALSE THEN
+            _MotorsHomed := MotorsHome();
+        ELSE
+            _MotorInitState := 2;
+        END_IF
+
+    2:
+        IF _MotorsReset = FALSE THEN
+            _MotorsReset := MotorsInit();
+        ELSE
+            _MotorInitState := 3;
+
+        END_IF
+
+    3:
+        IF _AlignNeeded THEN
+            IF MotorsInitAlignGearIn() THEN
+                _MotorInitState := 4;
+            END_IF
+        ELSE
+            _MotorInitState := 4;
+        END_IF
+
+    4:
+        SUPER^.Resetting();
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RestartStateCheck" Id="{80a5302a-0c4c-4b40-9dab-5cc923e237cf}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD RestartStateCheck
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="SafetyOK" Id="{4566be20-7d93-4893-a09f-b6a6e9c2af5e}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY SafetyOK : BOOL]]></Declaration>
+      <Set Name="Set" Id="{1e710182-025a-457e-8438-80f08bd72357}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SafetyOK := SafetyOK;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="SimHoming" Id="{37091d20-2eef-4e24-b3a6-84b305ab1006}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD SimHoming : BOOL
+VAR_INPUT
+    Motor  : REFERENCE TO FB_Component_BasicSlaveAxis_SoE;
+    SimPos : LREAL;
+END_VAR
+
+VAR_INST
+    _SimHomingState : USINT;
+    _SetPositionSim : FB_HomeRoutine_SetPosition;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE _SimHomingState OF
+    0:
+        SimHoming                    := FALSE;
+        Motor.HomeMethod             := _SetPositionSim;
+        _SetPositionSim.HomePosition := SimPos;
+        _SetPositionSim.Execute();
+        _SimHomingState := 10;
+
+    10:
+        IF _SetPositionSim.Busy = FALSE AND ABS(Motor.ActualPosition - SimPos) < 0.0001 THEN
+            _SimHomingState := 20;
+        END_IF
+
+    20:
+        SimHoming       := TRUE;
+        _SimHomingState := 0;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SimulationOff" Id="{9b5c3341-472f-46c2-b22b-7b66c249d875}" FolderPath="Simulation\">
+      <Declaration><![CDATA[METHOD SimulationOff : BOOL
+VAR_INPUT
+END_VAR
+
+VAR
+    i : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_InSimulation := FALSE;
+
+// Call this module's subunits, if any are defined
+FOR i := 1 TO NumberOfSubModules DO
+    IF ipSubmodules_SR[i] <> 0 THEN
+        ipSubModules_SR[i].SimulationOff();
+    END_IF
+END_FOR
+
+FOR i := 1 TO NumberOfComponents DO
+    ipComponents[i].InSimulation := FALSE;
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SimulationOn" Id="{b582cf97-0c9c-4a19-ab1b-f38b60ab1530}" FolderPath="Simulation\">
+      <Declaration><![CDATA[METHOD SimulationOn : BOOL
+VAR_INPUT
+END_VAR
+
+VAR
+    i : UDINT;
+
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_InSimulation := TRUE;
+
+// Call this module's subunits, if any are defined
+FOR i := 1 TO NumberOfSubModules DO
+    IF ipSubmodules_SR[i] <> 0 THEN
+        ipSubModules_SR[i].SimulationOn();
+    END_IF
+END_FOR
+
+FOR i := 1 TO NumberOfComponents DO
+    IF ipComponents[i] <> 0 THEN
+        ipComponents[i].InSimulation := TRUE;
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Starting" Id="{dd55ff2c-1c04-420e-a13a-8c014b400851}" FolderPath="PackMLStates\ActingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Starting
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF ParseDone = FALSE THEN
+
+    SUPER^.Starting();
+ELSE
+
+    SUPER^.Starting();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Step" Id="{c971733b-1f8d-4090-a3a2-e511a16b6c32}" FolderPath="I_MachineComms\">
+      <Declaration><![CDATA[PROPERTY Step : DINT]]></Declaration>
+      <Set Name="Set" Id="{50c7498b-5e08-428a-8867-5997b1cea92c}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Step := Step;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="SubModuleMonitor" Id="{e5bf4f82-aad5-4b49-ba5e-a360e409ac18}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary This method monitors <b>submodules</b> within this PackML module and initiates fault responses as required
+METHOD PROTECTED SubModuleMonitor : BOOL
+VAR
+    AlarmResponses : ARRAY[0..4] OF E_AlarmResponse; //Temporary response array	
+    i              : UDINT;
+END_VAR
+
+//! @description This method is called cyclically by <c>CyclicLogic()</c>
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO NumberOfSubModules DO
+    IF _CurrentState <> E_PMLState.ePMLState_Aborted AND
+       _CurrentState <> E_PMLState.ePMLState_Aborting AND
+       _CurrentState <> E_PMLState.ePMLState_Clearing AND
+       _CurrentState <> E_PMLState.ePMLState_Stopped AND
+       _CurrentState <> E_PMLState.ePMLState_Stopping THEN
+        AlarmResponses := ipSubModules[i].ParentResponseDefinitions;
+
+        CASE AlarmResponses[ipSubModules[i].CurrentAlarmSeverity] OF
+            E_AlarmResponse.Abort_ImmediateError:
+                SuspendImmediate();
+
+            E_AlarmResponse.Abort_Immediate:
+                SuspendControlled();
+
+            E_AlarmResponse.Stop_Immediate:
+                StopImmediate();
+
+            E_AlarmResponse.Stop_Controlled:
+                StopControlled();
+
+            E_AlarmResponse.Hold_Immediate:
+                HoldImmediate();
+
+            E_AlarmResponse.Hold_Controlled:
+                HoldControlled();
+
+            E_AlarmResponse.Suspend_Immediate:
+                SuspendImmediate();
+
+            E_AlarmResponse.Suspend_Controlled:
+                SuspendControlled();
+
+            E_AlarmResponse.NoResponse:
+                ;
+        END_CASE
+    ELSIF _CurrentState = E_PMLState.ePMLState_Stopped OR _CurrentState = E_PMLState.ePMLState_Stopping THEN
+        AlarmResponses := ipSubModules[i].ParentResponseDefinitions;
+
+        CASE AlarmResponses[ipSubModules[i].CurrentAlarmSeverity] OF
+            E_AlarmResponse.Abort_ImmediateError:
+                AbortImmediateError(ipSubModules[i].Name, TRUE);
+
+            E_AlarmResponse.Abort_Immediate:
+                AbortImmediate();
+
+            E_AlarmResponse.NoResponse:
+                ;
+        END_CASE
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspended" Id="{9e37d439-9554-4350-b8f1-088cf8acc64d}" FolderPath="PackMLStates\WaitingStates\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Suspended</b> state*)
+METHOD PROTECTED Suspended]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// IF MessageBox_Data.ErrorPresent = FALSE AND AutoUnsuspendCheck_TON.Q AND AutoUnsuspendAvailable THEN
+// 	ChangeState(State:=E_PMLCommand.ePMLCommand_Unsuspend);
+// 	AutoUnsuspendAvailable := FALSE;
+// END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspending" Id="{c99038aa-1d77-4d0f-b8be-8bfa845f4f2f}" FolderPath="PackMLStates\ActingStates\">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Suspending</b> state
+METHOD PROTECTED Suspending
+VAR
+    i               : UDINT;
+    SubModulesReady : BOOL := TRUE;
+END_VAR
+
+(*! <description><b>Note:</b> The <i>Suspend</i> command is intended to be initiated by automatic detection of upstream/downstream jams, etc. It is meant to be distinct from a <i>Hold</i> in that <i>Hold</i> should be commanded by an operator.  Both <i>Hold</i>and<i>Suspend</i> result in a <i>paused</i> state which should allow resumption of the <b>Execute</b> state. 
+<table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> Execute </td>
+		<td> Suspend Command </td> 
+		<td> State Complete </td>
+		<td> Suspended </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_MotorsReset      := FALSE;
+_MotorInitState   := 0;
+_ComponentsReset  := FALSE;
+_AlignGearInState := 0;
+_Handshake_State  := 0;
+
+SUPER^.Suspending();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="TaskState" Id="{70f359f1-bc71-4fdd-8b3e-58894d8bcafc}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY TaskState : E_TaskState]]></Declaration>
+      <Get Name="Get" Id="{a664ab35-f8f9-4292-9b8a-429bf31d17d1}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[TaskState := _TaskState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{1b050b38-022c-404f-84f1-959d7a886c2c}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_TaskState := TaskState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="TorqueHoming" Id="{b411db75-c734-440e-9ae5-c7903354037c}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD TorqueHoming : BOOL
+VAR_INPUT
+    Motor      : REFERENCE TO FB_Component_BasicSlaveAxis_SoE;
+    HomingInfo : REFERENCE TO ST_HomingParams;
+    Velocity   : LREAL;
+    Torque     : LREAL;
+    Direction  : SPT_Motion_Control.MC_Home_Direction;
+END_VAR
+
+VAR
+    McReadParam_Bias    : INT;
+    CurrentPositionBias : INT;
+    ParameterNumber     : INT;
+    Axis                : INT;
+    Value               : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TorqueHoming := FALSE;
+
+CASE HomingInfo.HomingState OF
+    0:
+        HomingInfo.TorqueControl(Axis              := Motor.Axis,
+                                 Execute           := FALSE,
+                                 Relative          :=,
+                                 Torque            := Torque,
+                                 TorqueRamp        := 50,
+                                 VelocityLimitHigh := Velocity,
+                                 VelocityLimitLow  := -Velocity,
+                                 BufferMode        :=,
+                                 Options           := HomingInfo.TorqueControlParams);
+
+        HomingInfo.Execute_WriteLimit := FALSE;
+
+        HomingInfo.TorqueControlParams.EnableManualTorqueStartValue := TRUE;
+        HomingInfo.TorqueControlParams.ManualTorqueStartValue       := Motor.Axis.NcToPlc.ActTorque;
+
+        IF Direction = SPT_Motion_Control.MC_Home_Direction.mcPositiveDirection THEN
+            HomingInfo.SetPositionHomingRoutine.HomePosition := HomingInfo.HomePosMax;
+        ELSE
+            HomingInfo.SetPositionHomingRoutine.HomePosition := HomingInfo.HomePosMin;
+        END_IF
+
+        Motor.HomeMethod       := HomingInfo.SetPositionHomingRoutine;
+        HomingInfo.HomingState := 1;
+
+    1:
+        // Ensure Motors are enabled before homing
+
+        IF Motor.Error THEN
+            Motor.Reset();
+        ELSE
+            HomingInfo.HomingState := 2;
+        END_IF
+
+    2:
+        Motor.GearOut();
+
+        IF Motor.InGear = FALSE THEN
+            HomingInfo.HomingState := 3;
+        END_IF
+
+    3:
+        // Ensure Motors are enabled before homing
+
+        Motor.Enable();
+
+        IF Motor.Enabled THEN
+            HomingInfo.HomingState := 5;
+        END_IF
+
+    5:
+        HomingInfo.Execute_WriteLimit := TRUE;
+        HomingInfo.EnablePosLim       := FALSE;
+        HomingInfo.EnableNegLim       := FALSE;
+
+        IF HomingInfo.WritePosLim.Done AND HomingInfo.WriteNegLim.Done THEN
+            HomingInfo.HomingState        := 10;
+            HomingInfo.Execute_WriteLimit := FALSE;
+
+        END_IF
+
+    10:
+        // Execute hard stop home for top and bottom carriages
+
+        HomingInfo.TorqueControl(Axis              := Motor.Axis,
+                                 Execute           := TRUE,
+                                 Relative          :=,
+                                 Torque            := Torque,
+                                 TorqueRamp        := 50,
+                                 VelocityLimitHigh := Velocity,
+                                 VelocityLimitLow  := -Velocity,
+                                 BufferMode        :=,
+                                 Options           := HomingInfo.TorqueControlParams);
+
+        HomingInfo.HomingTON(IN := ABS(Motor.Axis.NcToPlc.ActTorque - Torque) < 0.5 AND (Motor.ActualVelocity < 0.2), PT := T#100MS);
+
+        IF HomingInfo.HomingTON.Q THEN
+            HomingInfo.HomingState := 20;
+        END_IF
+
+    20:
+        IF Motor.Stop() THEN
+            HomingInfo.HomingState := 30;
+        END_IF
+
+    30:
+        IF Motor.Home() THEN
+            HomingInfo.HomingState := 40;
+        END_IF
+
+    40:
+        // Wait for hard stop homing routines to complete
+
+        Motor.Axis.ReadStatus();
+
+        IF (Motor.Axis.NcToPlc.ActPos - HomingInfo.SetPositionHomingRoutine.HomePosition) < 1 THEN
+            IF NOT Motor.Error THEN
+                HomingInfo.HomingState := 50;
+            ELSE
+                HomingInfo.HomingState := 5000;
+            END_IF
+        END_IF
+
+    50:
+        //         Motor.Disable();
+        // 
+        //         IF Motor.Enabled = FALSE THEN
+        //             HomingInfo.HomingState := 60;
+        //         END_IF
+        // 
+        //     60:
+        //         HomingInfo.SetPositionOffset(Axis     := Motor.Axis,
+        //                                      Execute  := TRUE,
+        //                                      Position := Motor.Axis.NcToPlc.ActPos,
+        //                                      Relative := FALSE,
+        //                                      Feedback := SPT_Motion_Control.E_PositionOffsetFeedback.ePositionOffsetFeedback1,
+        //                                      Memory   := SPT_Motion_Control.E_PositionOffsetMemory.ePositionOffsetMemory_Drive);
+        // 
+        //         IF HomingInfo.SetPositionOffset.Busy = FALSE THEN
+        //             HomingInfo.HomingState := 70;
+        //         END_IF
+        // 
+        //     70:
+        // Re-enable the Motors
+        HomingInfo.Execute_WriteLimit := TRUE;
+        HomingInfo.EnablePosLim       := TRUE;
+        HomingInfo.EnableNegLim       := TRUE;
+
+        IF HomingInfo.WritePosLim.Done AND HomingInfo.WriteNegLim.Done THEN
+            HomingInfo.HomingState        := 80;
+            HomingInfo.Execute_WriteLimit := FALSE;
+
+        END_IF
+
+    80:
+        Motor.Enable();
+
+        IF Motor.Enabled THEN
+            HomingInfo.HomingState := 90;
+        END_IF
+
+    90:
+        // Move to set position after homing
+
+        TorqueHoming           := TRUE;
+        HomingInfo.HomingState := 0;
+
+    5000:
+        Motor.Stop();
+
+    // Error in homing routine
+
+    {warning:error in homing routine}
+END_CASE
+
+HomingInfo.WritePosLim(Axis            := Motor.Axis,
+                       Execute         := HomingInfo.Execute_WriteLimit,
+                       ParameterNumber := SPT_Motion_Control.MC_AxisParameter.EnableLimitPos,
+                       Value           := HomingInfo.EnablePosLim);
+
+HomingInfo.WriteNegLim(Axis            := Motor.Axis,
+                       Execute         := HomingInfo.Execute_WriteLimit,
+                       ParameterNumber := SPT_Motion_Control.MC_AxisParameter.EnableLimitNeg,
+                       Value           := HomingInfo.EnableNegLim);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="TorqueHoming_old" Id="{ef56c2dd-3273-4190-a0f6-0e9db86e621a}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD TorqueHoming_old : BOOL
+VAR_INPUT
+    Motor      : REFERENCE TO FB_Component_BasicSlaveAxis_SoE;
+    HomingInfo : REFERENCE TO ST_HomingParams;
+    lag        : LREAL;
+    velocity   : LREAL;
+    torque     : LREAL;
+    Direction  : SPT_Motion_Control.MC_Home_Direction;
+END_VAR
+
+VAR
+    McReadParam_Bias    : INT;
+    CurrentPositionBias : INT;
+    ParameterNumber     : INT;
+    Axis                : INT;
+    Value               : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE HomingInfo.HomingState OF
+    0:
+        Motor.HomeMethod := HomingInfo.HardStopHomingRoutine;
+
+        // Init homing parameters for Hard Stop
+
+        //         HomingInfo.HardStopHomingParams.DisableDriveAccess     := TRUE;
+        HomingInfo.HardStopHomingParams.Acceleration           := velocity * 2;
+        HomingInfo.HardStopHomingParams.Deceleration           := velocity * 2;
+        HomingInfo.HardStopHomingParams.Direction              := Direction;
+        HomingInfo.HardStopHomingParams.DistanceLimit          := 10000;
+        HomingInfo.HardStopHomingParams.LagLimit               := lag;
+        HomingInfo.HardStopHomingParams.TorqueLimit            := torque;
+        HomingInfo.HardStopHomingParams.TimeLimit              := TIME#60S0MS;
+        HomingInfo.HardStopHomingParams.Velocity               := velocity;
+        HomingInfo.HardStopHomingParams.DetectionVelocityLimit := velocity * 1.5;
+        HomingInfo.HardStopHomingParams.DetectionVelocityTime  := T#400MS;
+        HomingInfo.HardStopHomingRoutine.CyclicLogic();
+
+        IF Direction = SPT_Motion_Control.MC_Home_Direction.mcPositiveDirection THEN
+            HomingInfo.HardStopHomingRoutine.HomePosition := HomingInfo.HomePosMax;
+        ELSE
+            HomingInfo.HardStopHomingRoutine.HomePosition := HomingInfo.HomePosMin;
+        END_IF
+
+        HomingInfo.HardStopHomingRoutine.Parameters := HomingInfo.HardStopHomingParams;
+        HomingInfo.HomingState                      := 1;
+
+    1:
+        // Ensure Motors are enabled before homing
+
+        IF Motor.Error THEN
+            Motor.Reset();
+        ELSE
+            HomingInfo.HomingState := 2;
+        END_IF
+
+    2:
+        Motor.GearOut();
+
+        IF Motor.InGear = FALSE THEN
+            HomingInfo.HomingState := 3;
+        END_IF
+
+    3:
+        // Ensure Motors are enabled before homing
+
+        Motor.Enable();
+
+        IF Motor.Enabled THEN
+            HomingInfo.HomingState := 10;
+        END_IF
+
+    10:
+        // Execute hard stop home for top and bottom carriages
+
+        IF Motor.Home() THEN
+            HomingInfo.HomingState := 20;
+        END_IF
+
+    20:
+        // Wait for hard stop homing routines to complete
+
+        IF Motor.Axis.Status.Homed THEN
+            IF NOT Motor.Error THEN
+                HomingInfo.HomingState := 21;
+            ELSE
+                HomingInfo.HomingState := 5000;
+            END_IF
+        END_IF
+
+    21:
+        //         Motor.Disable();
+
+        // 
+
+        //         IF Motor.Enabled = FALSE THEN
+
+        //             HomingInfo.HomingState := 22;
+
+        //         END_IF
+
+        // 
+
+        //     22:
+
+        // 
+
+        HomingInfo.SetPositionOffset(Axis     := Motor.Axis,
+                                     Execute  := TRUE,
+                                     Position := HomingInfo.HardStopHomingRoutine.HomePosition,
+                                     Relative := FALSE,
+                                     Feedback := SPT_Motion_Control.E_PositionOffsetFeedback.ePositionOffsetFeedback1,
+                                     Memory   := SPT_Motion_Control.E_PositionOffsetMemory.ePositionOffsetMemory_Drive);
+
+        IF HomingInfo.SetPositionOffset.Busy = FALSE THEN
+            HomingInfo.HomingState := 23;
+        END_IF
+
+    23:
+        //         Motor.HomeMethod := HomingInfo.AbsHomingRoutine;
+
+        //         HomingInfo.AbsHomingRoutine.Parameters REF= HomingInfo.AbsHomingParams;
+
+        //         HomingInfo.AbsHomingRoutine.Execute();
+
+        // 
+
+        //         HomingInfo.ReadParams(ParameterNumber:=MC_AxisParameter.AxisEncoderOffset,
+
+        //                               Axis           :=Motor.Axis,
+
+        //                               Value          =>HomingInfo.HomingBias);
+
+        // 
+
+        HomingInfo.HomingState := 30;
+
+    30:
+        // Re-enable the Motors
+
+        Motor.Enable();
+
+        IF Motor.Enabled THEN
+            HomingInfo.HomingState := 40;
+        END_IF
+
+    40:
+        // Move to set position after homing
+
+        TorqueHoming_old       := TRUE;
+        HomingInfo.HomingState := 0;
+
+    5000:
+        Motor.Stop();
+
+    // Error in homing routine
+
+    {warning:error in homing routine}
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="TrussInfoParse" Id="{3b1da5fc-558f-4626-973d-9b07a0116eb1}" FolderPath="I_CommandStepParser\">
+      <Declaration><![CDATA[METHOD TrussInfoParse : BOOL
+VAR_INPUT
+    Step    : ST_CSV_Step;
+    StepOut : REFERENCE TO ST_TrussInfo;
+END_VAR
+
+VAR
+    Detail          : ST_CSV_Detail;
+    conversionError : BOOL := FALSE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Ensure there's at least one detail in the step
+IF Step.DetailCount < 1 THEN
+    TrussInfoParse := FALSE;
+    RETURN;
+END_IF
+
+// Use the first detail
+Detail := Step.Details[1];
+
+// Check if the detail has enough data fields (adjust the number based on the fields needed)
+IF Detail.DataCount < 9 THEN
+    TrussInfoParse := FALSE;
+    RETURN;
+END_IF
+
+// TrussID
+StepOut.TrussID := Detail.Datas[1];
+
+// MemberCount
+StepOut.MemberCount := STRING_TO_INT(Detail.Datas[2]);
+
+// TrussXOffs
+StepOut.TrussXOffs := STRING_TO_REAL(Detail.Datas[3]);
+
+// TrussYOffs
+StepOut.TrussYOffs := STRING_TO_REAL(Detail.Datas[4]);
+
+// TrussLength
+StepOut.TrussLength := STRING_TO_REAL(Detail.Datas[5]);
+
+// TrussWidth
+StepOut.TrussWidth := STRING_TO_REAL(Detail.Datas[6]);
+
+// PressBeforeTruss
+// Assuming that the data is "1" = 'TRUE' or "0" = 'FALSE' as strings
+IF Detail.Datas[7] = '1' THEN
+    StepOut.PressBeforeTruss := TRUE;
+ELSE
+    StepOut.PressBeforeTruss := FALSE;
+END_IF
+
+// LeftEndType
+StepOut.LeftEndType := Detail.Datas[8];
+
+// RightEndType
+StepOut.RightEndType := Detail.Datas[9];
+
+TrussInfoParse := TRUE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unholding" Id="{25f7c913-a7a4-4232-8664-e1c5c913ab19}" FolderPath="PackMLStates\ActingStates\">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Unholding</b> state
+METHOD PROTECTED Unholding
+VAR
+    i               : UDINT;
+    SubModulesReady : BOOL := TRUE;
+END_VAR
+
+(*! <description><b></b><table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> Held </td>
+		<td> Unhold Command </td> 
+		<td> State Complete </td>
+		<td> Execute </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _ForceHold = FALSE THEN
+
+    CASE _MotorInitState OF
+        0:
+            IF _ComponentsReset = FALSE THEN
+                _ComponentsReset := ResetOnResume();
+            ELSE
+                _MotorInitState := 1;
+            END_IF
+
+        1:
+            IF _MotorsHomed = FALSE THEN
+                _MotorsHomed := MotorsHome();
+            ELSE
+                _MotorInitState := 2;
+            END_IF
+
+        2:
+            IF _MotorsReset = FALSE THEN
+                _MotorsReset := MotorsInit();
+            ELSE
+                _MotorInitState := 3;
+
+            END_IF
+
+        3:
+            IF _AlignNeeded THEN
+                IF MotorsInitAlignGearIn() THEN
+                    _MotorInitState := 4;
+                END_IF
+            ELSE
+                _MotorInitState := 4;
+            END_IF
+
+        4:
+            FOR i := 1 TO NumberOfSubModules DO
+                IF ipSubModules[i].CurrentState = E_PMLState.ePMLState_Held THEN
+                    ipSubModules[i].StateCommand := ePMLCommand_Unhold;
+                ELSIF ipSubModules[i].CurrentState = E_PMLState.ePMLState_Suspended THEN
+                    ipSubModules[i].StateCommand := ePMLCommand_Unsuspend;
+                END_IF
+            END_FOR
+
+            FOR i := 1 TO NumberOfSubModules DO
+                SubModulesReady := SubModulesReady AND (ipSubModules[i].CurrentState = ePMLState_Execute);
+            END_FOR
+
+            IF SubModulesReady AND (StateTasksComplete OR NoStateTasksToComplete) THEN
+                NoStateTasksToComplete := TRUE;
+                StateTasksComplete     := FALSE;
+                StateComplete();
+            END_IF
+    END_CASE
+
+ELSE
+    FOR i := 1 TO NumberOfSubModules DO
+        IF ipSubModules[i].CurrentState = E_PMLState.ePMLState_Held THEN
+            ipSubModules[i].StateCommand := ePMLCommand_Unhold;
+        ELSIF ipSubModules[i].CurrentState = E_PMLState.ePMLState_Suspended THEN
+            ipSubModules[i].StateCommand := ePMLCommand_Unsuspend;
+        END_IF
+    END_FOR
+
+    FOR i := 1 TO NumberOfSubModules DO
+        SubModulesReady := SubModulesReady AND (ipSubModules[i].CurrentState = ePMLState_Execute);
+    END_FOR
+
+    IF SubModulesReady AND (StateTasksComplete OR NoStateTasksToComplete) THEN
+        NoStateTasksToComplete := TRUE;
+        StateTasksComplete     := FALSE;
+        StateComplete();
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unsuspending" Id="{2655954b-8831-4dfc-b0c4-ba95a1572fa9}" FolderPath="PackMLStates\ActingStates\">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Unsuspending</b> state
+METHOD PROTECTED Unsuspending
+VAR
+    i               : UDINT;
+    SubModulesReady : BOOL := TRUE;
+END_VAR
+
+(*! <description><b></b><table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> Suspended </td>
+		<td> Unsuspend Command </td> 
+		<td> State Complete </td>
+		<td> Execute </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _ForceHold = FALSE THEN
+
+    CASE _MotorInitState OF
+        0:
+            IF _ComponentsReset = FALSE THEN
+                _ComponentsReset := ResetOnResume();
+            ELSE
+                _MotorInitState := 1;
+            END_IF
+
+        1:
+            IF _MotorsHomed = FALSE THEN
+                _MotorsHomed := MotorsHome();
+            ELSE
+                _MotorInitState := 2;
+            END_IF
+
+        2:
+            IF _MotorsReset = FALSE THEN
+                _MotorsReset := MotorsInit();
+            ELSE
+                _MotorInitState := 3;
+
+            END_IF
+
+        3:
+            IF _AlignNeeded THEN
+                IF MotorsInitAlignGearIn() THEN
+                    _MotorInitState := 4;
+                END_IF
+            ELSE
+                _MotorInitState := 4;
+            END_IF
+
+        4:
+            SUPER^.Unsuspending();
+    END_CASE
+
+ELSE
+    SUPER^.Unsuspending();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="WaitSync_Handler" Id="{c66757b7-d99a-4b2d-b02f-efbfe7de7f3c}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD WaitSync_Handler : BOOL
+VAR_INPUT
+    WaitSync : E_WaitSync;
+END_VAR
+
+VAR_OUTPUT
+    WaitSyncResponse : E_WaitSync;
+END_VAR
+
+VAR_INST
+    State : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[WaitSync_Handler := FALSE;
+WaitSyncResponse := _ResponseWaitSync;
+
+CASE State OF
+    0:
+        IF WaitSync > E_WaitSync.EMPTY THEN
+            State := 1;
+        END_IF
+
+    1:
+        _RequestedWaitSync := WaitSync;
+
+        IF _RequestedWaitSync = _ResponseWaitSync THEN
+            State := 2;
+        END_IF
+
+    2:
+        _RequestedWaitSync := E_WaitSync.EMPTY;
+
+        IF _ResponseWaitSync = E_WaitSync.EMPTY THEN
+            WaitSync_Handler := TRUE;
+            State            := 0;
+        END_IF
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="WaitSync_ReadWrite" Id="{bee3b92e-543e-42d6-ad30-b788913fc719}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD WaitSync_ReadWrite : BOOL
+VAR_INPUT
+    request  : REFERENCE TO E_WaitSync;
+    response : REFERENCE TO E_WaitSync;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[WaitSync_ReadWrite := FALSE;
+
+request           := _RequestedWaitSync;
+_ResponseWaitSync := response;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="WaitSyncCheck" Id="{72271750-baef-4014-bdff-ad2456c83a25}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD WaitSyncCheck : BOOL
+VAR_INPUT
+    Request : E_WaitSync;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[WaitSyncCheck := FALSE;
+
+_RequestedWaitSync := Request;
+
+IF _ResponseWaitSync = Request THEN
+    WaitSyncCheck := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

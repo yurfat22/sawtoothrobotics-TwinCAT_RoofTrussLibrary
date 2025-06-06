@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Messages" Id="{36afb55c-95fb-4489-aea1-293a5c1ef707}">
+    <Declaration><![CDATA[TYPE
+    ST_Messages : STRUCT
+        MessageUuid     : STRING[40]; // UUIDs are typically 36 characters
+        MessageCategory : STRING[20]; // E.g., "Status"
+        TimeStamp       : STRING[12]; // Unsigned 64-bit integer for timestamp
+        Status          : ST_Status;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

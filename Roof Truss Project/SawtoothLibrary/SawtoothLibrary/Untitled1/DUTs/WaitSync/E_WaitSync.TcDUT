@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_WaitSync" Id="{19a0b12d-7a75-4d6b-8469-0f2a6107dd1a}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_WaitSync : (
+        EMPTY                                := 0,
+        BOARD_READY_FOR_NAILPLATE            := 1,
+        CARRIAGE1_INFEED_DATA_CONFIRMED      := 2,
+        CARRIAGE1_INFEED_BOARD_READY         := 3,
+        CARRIAGE1_INFEED_BOARD_PICKED        := 4,
+        CARRIAGE2_INFEED_DOUBLE_PICK_REQUEST := 5,
+        CARRIAGE2_INFEED_DOUBLE_PICK_READY   := 6,
+        HANDOFF2_PRESS_TOTAL_NP_COUNT        := 7,
+        HANDOFF2_PRESS_DOUBLE_PICK           := 8,
+        CARRIAGE2_PRESS_READY_FOR_BOARD      := 9,
+        CARRIAGE2_PRESS_NAILPLATE_DONE       := 10,
+        CARRIAGE2_PRESS_BOARD_IN_POSITION    := 11,
+        CARRIAGE2_CARRIAGE1_GEARED_IN        := 12,
+        CARRIAGE2_CARRIAGE1_GEAR_IN          := 13,
+        CARRIAGE2_CARRIAGE1_GEAR_OUT         := 14,
+        CARRIAGE1_INFEED_BOARD_PICKING       := 15,
+        CARRIAGE2_INFEED_DOUBLE_PICK_DONE    := 16,
+        CARRIAGE1_INFEED_PICKING             := 17,
+        CARRIAGE1_INFEED_BOARD_LENGTH_CHECK  := 18,
+        CARRIAGE2_INFEED_BOARD_LENGTH_CHECK  := 19,
+        INFEED1_MBI_DROP_BOARD               := 20,
+        INFEED1_INFEED2_RELEASE_BOARD        := 21,
+        INFEED2_MBI_DROP_BOARD               := 22,
+        NAILPLATE_READY_TO_PLACE             := 50,
+        NAILPLATE_PLACED                     := 51,
+        PRESS_ROBOT_PERMISSION_GRANTED       := 52,
+        PRESS_PREPLATE_SIM_SYNC              := 53,
+        PICK1_ASSEMBLY_BOARD_READY           := 70,
+        PICK1_ASSEMBLY_OPEN_GRIPPERS         := 71,
+        PICK1_ASSEMBLY_BOARD_CLEAR           := 72,
+        PICK1_ASSEMBLY_PICKING_BOARD         := 73,
+        OUTFEED_JIG2_PICKPLACE_READY         := 74,
+        OUTFEED_JIG2_PICKPLACE_DONE          := 75,
+        OUTFEED_JIG3_PICKPLACE_READY         := 76,
+        OUTFEED_JIG3_PICKPLACE_DONE          := 77
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

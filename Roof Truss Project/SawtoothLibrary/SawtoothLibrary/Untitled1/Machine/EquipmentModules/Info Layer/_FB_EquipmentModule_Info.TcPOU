@@ -1,0 +1,164 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="_FB_EquipmentModule_Info" Id="{5627af5e-5a59-4c0c-b90c-66426a8fc9f9}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK _FB_EquipmentModule_Info EXTENDS FB_EquipmentModule_SR
+VAR
+    //Data for recipe
+    _Task               : ST_Task;
+    TESTrecoveryStepNum : DINT;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{0baae7da-820f-4edf-80b7-d18e99c18790}" />
+    <Folder Name="Methods" Id="{b52053a3-3fd9-4211-aa4b-b65a9e6e5ea7}">
+      <Folder Name="ActingStates" Id="{fd602ad4-b18a-416b-8d5f-11655ea664a0}" />
+    </Folder>
+    <Folder Name="Properties" Id="{e5c894c9-ca3f-48b6-98a7-165b232f383e}" />
+    <Method Name="Aborting" Id="{577a0b2b-715b-4e95-9579-c73f8be9f7cd}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Aborting</b> state*)
+METHOD PROTECTED Aborting
+
+VAR
+    result : USINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE _CurrentMode OF
+    E_PMLUnitMode.ePMLUnitMode_Production:
+
+        IF _Task.Info.State = E_TaskState.ACTIVE OR _Task.Info.State = E_TaskState.PENDING THEN
+            result := RaiseMessageBox(Header   := CONCAT('Abort Requested:', _Task.Info.StationName),
+                                      Message1 := CONCAT('How do you want to abort truss ', UDINT_TO_STRING(_Task.Info.CurrentTaskId)),
+                                      Message2 := 'ABORT will scrap the truss',
+                                      Message3 := 'MANUAL will stop running the truss but allow you to manually build it.',
+                                      Message4 := 'RETRY will stop running the truss and requeue it in SAM',
+                                      Message5 := 'REFRESH will discard current data and request New Data from SAM',
+                                      Btn2     := 'ABORT',
+                                      Btn3     := 'MANUAL',
+                                      Btn4     := 'RETRY',
+                                      Btn5     := 'REFRESH',
+                                      Severity := TcEventSeverity.Error);
+
+            IF result = 2 THEN
+                _Task.Info.State           := E_TaskState.ABORT;
+                _Task.Info.CurrentTaskStep := 0;
+                _Task.StatusUpdate         := TRUE;
+                _Task.Info.Active          := FALSE;
+            ELSIF result = 3 THEN
+                _Task.Info.State           := E_TaskState.MANUAL;
+                _Task.Info.CurrentTaskStep := 0;
+                _Task.StatusUpdate         := TRUE;
+                _Task.Info.Active          := FALSE;
+           ELSIF result = 4 THEN
+                _Task.Info.State           := E_TaskState.ABORT_RETRY;
+                _Task.Info.CurrentTaskStep := 0;
+                _Task.StatusUpdate         := TRUE;
+                _Task.Info.Active          := FALSE;
+            ELSIF result = 5 THEN
+                _Task.Info.Active          := FALSE;
+                _Task.Info.State           := E_TaskState.IDLE;
+                _Task.Info.CurrentTaskStep := 0;
+                _Task.StatusUpdate         := TRUE;
+                _Task.Info.CurrentTaskId   := 0;
+            END_IF
+
+        ELSE
+            SUPER^.Aborting();
+        END_IF
+
+    E_PMLUnitMode.ePMLUnitMode_Maintenance:
+        SUPER^.Aborting();
+
+    E_PMLUnitMode.ePMLUnitMode_Manual:
+        SUPER^.Aborting();
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{1f94eb36-9046-47d4-8c92-a2ed5d16ca53}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR
+
+VAR
+    StepInfo : ST_CSV_Step;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+_Task.Info.TrussID := _Task.CSV.Steps[1].Details[1].Datas[1];
+
+IF THIS^.CurrentState <> E_PMLState.ePMLState_Execute THEN
+    _Task.Info.Active := FALSE;
+END_IF
+
+SUPER^.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="FindBoardForRecovery" Id="{83ba01c5-3d1f-48df-a16e-4c4a89b059e6}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD FindBoardForRecovery : UDINT
+VAR_INPUT
+    BoardID : DINT;
+END_VAR
+
+VAR
+    i                     : UDINT;
+    RecoveryBoardData     : INT;
+    RecoveryPickPlaceData : ST_PickPlace;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO MAX_STEP_COUNT DO
+    CASE _Task.CSV.Steps[i].seqName OF
+        E_CommandName.BoardInfo:
+            RecoveryBoardData := STRING_TO_INT(_Task.CSV.Steps[i].Details[1].Datas[2]);
+
+            IF RecoveryBoardData = BoardID THEN
+                FindBoardForRecovery := i;
+                EXIT;
+            ELSE
+                FindBoardForRecovery := 0;
+            END_IF
+
+        E_CommandName.Board:
+            RecoveryBoardData := STRING_TO_INT(_Task.CSV.Steps[i].Details[1].Datas[5]);
+
+            IF RecoveryBoardData = BoardID THEN
+                FindBoardForRecovery := i;
+                EXIT;
+            ELSE
+                FindBoardForRecovery := 0;
+            END_IF
+
+        E_CommandName.PickPlace:
+            PickPlaceParse(_Task.CSV.Steps[i], RecoveryPickPlaceData);
+            RecoveryBoardData := RecoveryPickPlaceData.Number;
+
+            IF RecoveryPickPlaceData.Number = BoardID THEN
+                FindBoardForRecovery := i;
+                EXIT;
+            ELSE
+                FindBoardForRecovery := 0;
+            END_IF
+
+    ELSE
+        FindBoardForRecovery := 0;
+
+    END_CASE
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Task" Id="{306edbcd-cad0-427f-b9f8-a6e1b64e806d}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Task : REFERENCE TO ST_Task;]]></Declaration>
+      <Get Name="Get" Id="{b2ebcfb2-9dd1-49b8-948d-07d34148cb09}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Task REF= _Task;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>

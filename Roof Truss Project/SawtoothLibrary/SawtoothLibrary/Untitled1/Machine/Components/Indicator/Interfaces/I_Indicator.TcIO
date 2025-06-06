@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_Indicator" Id="{ccfdfa01-d0e3-4f35-b29d-a16def021e32}">
+    <Declaration><![CDATA[INTERFACE I_Indicator]]></Declaration>
+    <Method Name="Flash" Id="{9b233834-00bb-4ee5-bdce-784659a71445}">
+      <Declaration><![CDATA[METHOD Flash
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="TurnOff" Id="{e910b58a-e84f-4acf-8628-412e3b28658a}">
+      <Declaration><![CDATA[METHOD TurnOff
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="TurnOn" Id="{6b06190f-522d-4c7a-87b4-da85a0178d06}">
+      <Declaration><![CDATA[METHOD TurnOn
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

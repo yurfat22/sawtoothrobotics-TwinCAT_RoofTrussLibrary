@@ -1,0 +1,263 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_Robot" Id="{58ed1cee-71aa-49f9-a99c-757c7c4d6a2e}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_Robot EXTENDS FB_ComponentBase_SR
+VAR_INPUT
+    Handshake         : ST_Robot_Handshake_IO;
+    RecipeData_ToSend : ARRAY[0..14] OF DINT;
+    Current_StepNum   : UINT;
+
+END_VAR
+
+VAR
+    Robot_Name : STRING;
+
+    InputArray       AT %I* : ARRAY[0..7] OF USINT;
+    OtherInputsArray AT %I* : ARRAY[0..7] OF USINT;
+
+    // Outputs
+    OutputArray       AT %Q* : ARRAY[0..7] OF USINT;
+    OtherOutputsArray AT %Q* : ARRAY[0..7] OF USINT;
+
+    Recipe_PackedBytes AT %Q* : ARRAY[0..16] OF USINT; // Maximum size of packed bytes array
+    Recipe_ByteQtyKey  AT %Q* : ARRAY[0..14] OF USINT; // Array to store the number of bytes for each number
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{ec4f5aca-60f4-4404-a4d4-7e0d7ec21e06}" />
+    <Folder Name="Methods" Id="{9b9fe13c-9655-418b-b1ad-8cf7250ae691}" />
+    <Folder Name="Properties" Id="{be7bb98f-6cec-47a9-8833-2469ea2bc99d}" />
+    <Method Name="Clear_DataToSend" Id="{d7464a06-728a-432b-9c00-e716837d010d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Clear_DataToSend : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 0 TO 14 DO
+    RecipeData_ToSend[i] := 0;
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CreateEvents" Id="{e51c11a5-b955-485e-8c6a-2f36d90f0de1}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{f7a6ebf4-d7ef-4178-9dd9-843ab5364cd4}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+// map signals
+HandshakeSignalMapping();
+
+PackRecipeData();
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := Comp_Alarms, CurrentSeverity := _CurrentAlarmSeverity);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HandshakeSignalMapping" Id="{b01144dc-2256-49f7-8f8e-6d80401dea07}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HandshakeSignalMapping : bool
+VAR
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[OutputArray[0].0 := Handshake.OUT.Execute_Step;
+OutputArray[0].1 := Handshake.OUT.MessageAcknowledge;
+OutputArray[0].2 := Handshake.OUT.Execute_Service;
+
+memcpy(ADR(OutputArray[2]), ADR(Handshake.OUT.Execute_StepNum), 2);
+
+//SubStepNumber is an enumerator and that is a DINT and we need it to only be a USINT
+memcpy(ADR(OutputArray[4]), ADR(Handshake.OUT.SubStepResponse), 1);
+
+//	OutputArray[4] := Handshake.OUT.SubStepResponse;
+OutputArray[5] := Handshake.OUT.MessageSolution;
+OutputArray[6] := Handshake.OUT.Execute_ServiceNum;
+
+Handshake.IN.Executing_Step    := InputArray[0].0;
+Handshake.IN.StepComplete      := InputArray[0].1;
+Handshake.IN.ErrorPresent      := InputArray[0].2;
+Handshake.IN.Executing_Service := InputArray[0].3;
+Handshake.IN.ServiceComplete   := InputArray[0].4;
+Handshake.IN.TaskRunning       := InputArray[0].5;
+
+memcpy(ADR(Handshake.IN.MessageNumber), ADR(InputArray[2]), 2);
+
+//SubStepNumber is an enumerator and that is a DINT and we need it to only be a USINT
+memcpy(ADR(Handshake.IN.SubStepNumber), ADR(InputArray[4]), 1);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{3baeb734-503b-48ad-b88a-f1b37e428795}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{a4d52334-5b31-4d96-b118-4574b9add5ea}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="OtherInputs" Id="{3e71f421-59b7-4582-92a0-a63f2d8c8895}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OtherInputs : ARRAY[0..7] OF USINT]]></Declaration>
+      <Get Name="Get" Id="{2db3a8b9-bafb-4ab3-a544-60efb8b79310}">
+        <Declaration><![CDATA[PUBLIC
+VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[OtherInputs := OtherInputsArray;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="OtherOutputs" Id="{cb839137-2ea9-4c32-8683-238a3b74f144}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OtherOutputs : ARRAY[0..7] OF USINT]]></Declaration>
+      <Set Name="Set" Id="{0dd5a2c5-a1e3-4942-9970-fba9f88e09a4}">
+        <Declaration><![CDATA[PUBLIC
+VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[OtherOutputsArray := OtherOutputs;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="PackRecipeData" Id="{d74df44b-22ee-420a-a445-52cb0f419464}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PackRecipeData : BOOL
+VAR
+    i, j         : INT; // Loop counters
+    index        : INT; // Temporary variable to hold the number
+    numberToPack : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// The Bitmask range for each robot (32 bytes) is divided into two sections, one for key values and one for data
+
+// The key section includes 15 bytes, one for each possible data field
+
+// The data values inludes 17 bytes, which can be dynamically allocated as needed for each data field based on the size of the number
+
+// Group Input mapping on robot appears as follows
+
+// giKey1 : USINT;               giData1 : USINT;
+
+// giKey2 : USINT;               giData2 : USINT;
+
+// giKey3 : USINT;               giData3 : USINT;
+
+// giKey4 : USINT;               giData4 : USINT;
+
+// giKey5 : USINT;               giData5 : USINT;
+
+// giKey6 : USINT;               giData6 : USINT;
+
+// ...                           ...
+
+// Example:
+
+// Wall SAM ID is the first field of WallInfo step which is a large number 157864127 with needing 4 bytes to send.
+
+// The next field of WallInfo is wall length which is 2000mm requiring 2 bytes to send.
+
+// giKey1 is set to 4 and the number is divided into bytes occupying giData1,giData2,giData3, and giData4.
+
+// giKey2 is set to 2 and the number is divided into bytes occupying giData5 and giData6.
+
+// Function to pack NumbersToSend into bytes and determine key values
+
+// first clear array
+
+FOR i := 0 TO 14 DO
+    Recipe_ByteQtyKey[i] := 0;
+END_FOR
+
+FOR i := 0 TO 16 DO
+    Recipe_PackedBytes[i] := 0;
+END_FOR
+
+index := 0;
+
+FOR i := 0 TO 10 DO
+
+    // Determine how many bytes each number will occupy
+
+    Recipe_ByteQtyKey[i] := 1;
+
+    FOR j := 1 TO 3 DO
+        IF ABS(RecipeData_ToSend[i]) > EXPT(2, (8 * j) - 1) THEN
+            Recipe_ByteQtyKey[i] := INT_TO_USINT(j) + 1;
+
+            // Make it easier to unpack by forcing data to be USINT (1), UINT (2) or UDINT (4)
+
+            IF Recipe_ByteQtyKey[i] = 3 THEN
+                Recipe_ByteQtyKey[i] := 4;
+            END_IF
+        END_IF
+    END_FOR
+
+    // Handle signed numbers
+
+    numberToPack := RecipeData_ToSend[i];
+
+    IF numberToPack < 0 THEN
+        // Convert to Two's Complement for the required byte size
+
+        CASE Recipe_ByteQtyKey[i] OF
+            1:
+                numberToPack := numberToPack AND 16#FF; // Mask for 8 bits
+            2:
+                numberToPack := numberToPack AND 16#FFFF; // Mask for 16 bits
+            4:
+                numberToPack := numberToPack AND 16#FFFFFFFF; // Mask for 32 bits
+        END_CASE;
+    END_IF
+
+    // Now extract individual bytes from signed number
+
+    IF Recipe_ByteQtyKey[i] = 1 THEN
+        Recipe_PackedBytes[index] := UDINT_TO_USINT(numberToPack);
+        index                     := index + 1;
+    ELSE
+        FOR j := Recipe_ByteQtyKey[i] - 1 TO 1 BY -1 DO
+            Recipe_PackedBytes[index] := UDINT_TO_USINT(SHR(numberToPack, 8 * j));
+            index                     := index + 1;
+        END_FOR
+
+        // Get the last byte
+
+        Recipe_PackedBytes[index] := UDINT_TO_USINT(numberToPack);
+        index                     := index + 1;
+    END_IF
+
+END_FOR;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

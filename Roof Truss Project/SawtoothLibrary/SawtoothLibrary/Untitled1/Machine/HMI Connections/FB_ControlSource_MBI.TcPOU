@@ -1,0 +1,138 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_ControlSource_MBI" Id="{1931f585-43d1-4b5b-ad14-5f4007e0db33}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ControlSource_MBI EXTENDS FB_CyclicFB IMPLEMENTS I_PackML_ExternalController
+VAR_INPUT
+END_VAR
+
+VAR_OUTPUT
+END_VAR
+
+VAR
+    ipModule                  : I_PackML_Control;
+    MainPMLControl_Simplified : ST_PackML_Control_Simplified;
+    MainPMLControl_Standard   : ST_PackML_Control;
+    R_HMICommand              : R_TRIG;
+
+    MBI_IdleMode        : BOOL;
+    MBI_AutoMode AT %I* : BOOL;
+    MBI_Manual1  AT %I* : BOOL;
+    MBI_Manual2  AT %I* : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{e0e2bbe9-354f-43e0-ae7c-d56747d5889c}" />
+    <Folder Name="I_PackML_ExternalController" Id="{bcdcf643-5725-42a0-aad9-640b2153d814}" />
+    <Property Name="Control" Id="{642c8bb9-a97d-4d05-afd2-ffba1a1d039a}" FolderPath="I_PackML_ExternalController\">
+      <Declaration><![CDATA[PROPERTY Control : SPT_BaseTypes.I_PackML_Control]]></Declaration>
+      <Set Name="Set" Id="{60df448d-7a34-4241-845a-bfdba4ef8f46}">
+        <Declaration><![CDATA[]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ipModule := Control;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="CyclicLogic" Id="{8b117bcb-258b-4830-ac43-03019dbbb548}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR
+    i : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+MainPMLControl_Standard.CurrentMode  := ipModule.CurrentMode;
+MainPMLControl_Standard.CurrentState := ipModule.CurrentState;
+
+FOR i := 1 TO 5 DO
+    MainPMLControl_Standard.ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+END_FOR
+
+MBI_IdleMode := (NOT MBI_AutoMode) AND (NOT MBI_Manual1) AND (NOT MBI_Manual2);
+
+IF MBI_IdleMode THEN
+    //Process HMI requests
+    R_HMICommand(CLK := (MainPMLControl_Simplified.ResetPressed XOR MainPMLControl_Simplified.StartPressed XOR MainPMLControl_Simplified.StopPressed
+                            ) XOR
+                        (MainPMLControl_Standard.StateCommand <> E_PMLCommand.ePMLCommand_Undefined AND
+                        ipModule.StateCommand <> MainPMLControl_Standard.StateCommand) XOR
+                        (ipModule.ModeCommand <> MainPMLControl_Standard.ModeCommand));
+
+END_IF
+
+IF R_HMICommand.Q THEN
+    IF MainPMLControl_Simplified.ResetPressed AND
+       MainPMLControl_Simplified.ResetPermissive AND
+       MainPMLControl_Standard.CurrentState = E_PMLState.ePMLState_Aborted THEN
+        ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Clear);
+    ELSIF MainPMLControl_Simplified.ResetPressed AND MainPMLControl_Simplified.ResetPermissive THEN
+        ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Reset);
+    ELSIF MainPMLControl_Simplified.StartPressed AND MainPMLControl_Simplified.StartPermissive THEN
+        IF MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Idle THEN
+            ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Start);
+        ELSIF MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Held THEN
+            ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Unhold);
+        ELSIF MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Suspended THEN
+            ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Unsuspend);
+        END_IF
+    ELSIF MainPMLControl_Simplified.StopPressed AND MainPMLControl_Simplified.StopPermissive THEN
+        ipModule.ChangeState(Tc3_PackML_V2.E_PMLCommand.ePMLCommand_Hold);
+    ELSIF ipModule.StateCommand <> MainPMLControl_Standard.StateCommand THEN
+        ipModule.StateCommand := MainPMLControl_Standard.StateCommand;
+    ELSIF ipModule.ModeCommand <> MainPMLControl_Standard.ModeCommand THEN
+        ipModule.ModeCommand := MainPMLControl_Standard.ModeCommand;
+    END_IF
+END_IF
+
+MainPMLControl_Simplified.StartPermissive := MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Idle OR
+                                             MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Held OR
+                                             MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Suspended;
+
+MainPMLControl_Simplified.StopPermissive := MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Execute;
+
+MainPMLControl_Simplified.ResetPermissive := MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Complete OR
+                                             MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Stopped OR
+                                             MainPMLControl_Standard.CurrentState = Tc3_PackML_V2.E_PMLState.ePMLState_Aborted;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{88bce998-331c-46dd-9fe4-75b0972a4e2a}">
+      <Declaration><![CDATA[METHOD FINAL Initialize : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Registered THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ModeChanged" Id="{2541f362-a71c-4dc4-a2f0-1e424e34a404}" FolderPath="I_PackML_ExternalController\">
+      <Declaration><![CDATA[METHOD FINAL ModeChanged
+VAR_INPUT
+    NewMode : SPT_BaseTypes.E_PMLUnitMode;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MainPMLControl_Standard.ModeCommand := NewMode;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Registered" Id="{83d278ee-e592-4dac-a75e-e78454d7a5a6}">
+      <Declaration><![CDATA[PROPERTY Registered : BOOL]]></Declaration>
+      <Get Name="Get" Id="{9a15b28c-e173-44f4-81e2-9bf42892270d}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Registered := ipModule <> 0;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="StateChanged" Id="{12b658e2-fb16-4263-a9a3-1bc658e2798a}" FolderPath="I_PackML_ExternalController\">
+      <Declaration><![CDATA[METHOD FINAL StateChanged
+VAR_INPUT
+    NewState : SPT_BaseTypes.E_PMLCommand;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MainPMLControl_Standard.StateCommand := NewState;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

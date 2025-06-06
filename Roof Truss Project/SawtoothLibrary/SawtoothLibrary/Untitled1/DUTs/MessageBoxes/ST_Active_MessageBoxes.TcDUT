@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Active_MessageBoxes" Id="{595b70b6-e54d-4c38-aa12-27e87446470e}">
+    <Declaration><![CDATA[TYPE
+    ST_Active_MessageBoxes : STRUCT
+        SelectedTabIndex          : USINT;
+        MessageBox_Data           : ARRAY[1..30] OF ST_MessageBox_Data;
+        Displayed_MessageBox_Data : ST_MessageBox_Data;
+        ErrorSolution             : USINT;
+        ErrorAcknowledge          : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

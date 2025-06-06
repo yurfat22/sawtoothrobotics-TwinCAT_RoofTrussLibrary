@@ -1,0 +1,1199 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Outfeed_Jig" Id="{2cbefa3b-b990-41ac-bed8-058fb58e2f58}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Outfeed_Jig EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    ipSubModules_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_PackML_BaseModule := [];
+
+    // Component definitions here
+
+    Convey_Motors : ARRAY[1..7] OF FB_Conveyor;
+
+    //Convey_Sensors        : ARRAY[1..7] OF FB_DigitalSensor;
+    Shift_Motors   : FB_Component_ABB_VFD_EC;
+    ControlPendant : FB_ControlPendant_Outfeed   := (Name := 'ControlPendent');
+    LightStack     : FB_Component_StackLight_MBI := (Name := 'LightStack');
+
+    //Alarms for this module
+
+    AllDone                  : BOOL;
+    testnum                  : INT   := 1;
+    testpos                  : LREAL := 1000;
+    testdist                 : LREAL := 1000;
+    _PickPlace_Ready_ENUM    : E_WaitSync;
+    _PickPlace_Done_ENUM     : E_WaitSync;
+    MoveVelocitySpeed        : LREAL := -500;
+    ClearOccupiedOutfeedData : BOOL;
+
+    _OutfeedAutostopOK   : BOOL;
+    SuspendTON           : TON;
+    RecoveryDetected     : BOOL;
+    IndexingBlockedAlarm : BOOL;
+    TestConveyorsON      : BOOL;
+    _ParentState         : E_PMLState;
+
+    AllStopped                  : BOOL;
+    EnableManualConveyorControl : BOOL;
+    ManualConveyorSpeed         : LREAL := 500;
+    ManualModeActive            : BOOL;
+    ManualControlConveyFWD      : BOOL;
+    ManualControlConveyREV      : BOOL;
+
+    ManualReset : BOOL;
+END_VAR
+
+VAR CONSTANT
+    OUTFEED_ALARMS_COUNT : USINT := 10;
+END_VAR
+
+VAR
+    OutfeedJigAlarms : ARRAY[1..OUTFEED_ALARMS_COUNT] OF FB_TcAlarm;
+
+    SimHomingLocalState : DINT;
+    SimHomingIndex      : UDINT;
+
+    OutfeedMasterAutoSpeed   : LREAL := 500;
+    OutfeedMasterManualSpeed : LREAL := 50;
+
+    TrussInfo         : ST_TrussInfo;
+    IndexConveyor     : ST_IndexConveyor;
+    PickPlace         : ST_PickPlace;
+    _MaxConveyorCount : UDINT;
+    _MainSafetyOK     : BOOL;
+    _AutostopOK       : BOOL;
+
+    //
+    StartUp : BOOL := TRUE;
+
+    _OutfeedConveyorStatus : ST_OutfeedConveyorStatus;
+END_VAR
+
+VAR PERSISTENT
+    ConvData : ARRAY[1..7] OF ST_ConveyorData;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{2fb8a75e-e984-4f6f-be16-17bfe4be93cb}" />
+    <Folder Name="Methods" Id="{93016d2e-ed86-4b86-86b8-14866f6e797d}">
+      <Folder Name="ActingStates" Id="{1f87a5df-2a7b-4901-896b-7fc4d0fb5c03}" />
+      <Folder Name="CommandSteps" Id="{c3452fea-64dd-4c04-be5e-f0b2f1a2c176}" />
+      <Folder Name="WaitingStates" Id="{5ea7cafe-7860-4562-aba0-7d0d9d66554c}" />
+    </Folder>
+    <Folder Name="Properties" Id="{3997e848-20e2-457e-ba28-92ba9ee0445f}" />
+    <Method Name="Aborted" Id="{e89b100b-9e02-4d25-8799-df6a9daa73df}" FolderPath="Methods\WaitingStates\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Aborted</b> state*)
+METHOD PROTECTED Aborted]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ControlPendant.Light.Flash();
+LightStack.WhiteLight.Flash();
+LightStack.Siren.TurnOff();
+
+IF _OutfeedAutostopOK AND _MainSafetyOK THEN
+    ChangeState(E_PMLCommand.ePMLCommand_Clear);
+END_IF
+
+AllStopped := FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="AutostopOK" Id="{e0729212-0eac-4b53-83df-3c89662b221b}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY AutostopOK : bool]]></Declaration>
+      <Set Name="Set" Id="{3b0f49f9-fd99-4ac4-b959-d16f3c2b15ac}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_AutostopOK := AutostopOK;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="ComponentMonitor" Id="{abb88be7-f2c2-4ab3-8334-f482654d05dd}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary This method monitors <b>components</b> within this PackML module and initiates fault responses as required
+METHOD PROTECTED ComponentMonitor : BOOL
+VAR
+    AlarmResponses : ARRAY[0..4] OF E_AlarmResponse; //Temporary response array
+    i              : UDINT;
+END_VAR
+
+//! @description This method is called cyclically by <c>CyclicLogic()</c>
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 2 TO NumberOfComponents DO
+    IF _CurrentState <> E_PMLState.ePMLState_Aborted AND
+       _CurrentState <> E_PMLState.ePMLState_Aborting AND
+       _CurrentState <> E_PMLState.ePMLState_Clearing AND
+       _CurrentState <> E_PMLState.ePMLState_Suspended AND
+       _CurrentState <> E_PMLState.ePMLState_Unsuspending AND
+       _CurrentState <> E_PMLState.ePMLState_Held AND
+       _CurrentState <> E_PMLState.ePMLState_Unholding AND
+       _CurrentState <> E_PMLState.ePMLState_Stopped AND
+       _CurrentState <> E_PMLState.ePMLState_Stopping THEN
+        AlarmResponses := ipComponents[i].ParentResponseDefinitions;
+
+        CASE AlarmResponses[ipComponents[i].CurrentAlarmSeverity] OF
+            E_AlarmResponse.Abort_ImmediateError:
+                SuspendImmediate();
+
+            E_AlarmResponse.Abort_Immediate:
+                SuspendControlled();
+
+            E_AlarmResponse.Stop_Immediate:
+                StopImmediate();
+
+            E_AlarmResponse.Stop_Controlled:
+                StopControlled();
+
+            E_AlarmResponse.Hold_Immediate:
+                HoldImmediate();
+
+            E_AlarmResponse.Hold_Controlled:
+                HoldControlled();
+
+            E_AlarmResponse.Suspend_Immediate:
+                SuspendImmediate();
+
+            E_AlarmResponse.Suspend_Controlled:
+                SuspendControlled();
+
+            E_AlarmResponse.NoResponse:
+                ;
+        END_CASE
+    ELSIF _CurrentState = E_PMLState.ePMLState_Stopped OR _CurrentState = E_PMLState.ePMLState_Stopping THEN
+        AlarmResponses := ipComponents[i].ParentResponseDefinitions;
+
+        CASE AlarmResponses[ipComponents[i].CurrentAlarmSeverity] OF
+            E_AlarmResponse.Abort_ImmediateError:
+                AbortImmediateError(ipComponents[i].Name, FALSE);
+
+            E_AlarmResponse.Abort_Immediate:
+                AbortImmediate();
+
+            E_AlarmResponse.NoResponse:
+                ;
+        END_CASE
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CreateEvents" Id="{3cae3120-a5a3-4d2c-bbc8-d12088f26b02}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_CreateAllEventsInClass(Alarms     := OutfeedJigAlarms,
+                         ClassSize  := SIZEOF(TC_EVENTS.Outfeed_Jig),
+                         pInitEvent := ADR(TC_EVENTS.Outfeed_Jig.InitReferenceEvent),
+                         Prefix     := _Name);
+
+SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{2d3a5b30-7efe-4c1c-bb7c-b8c43b7f7ddc}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR
+
+VAR
+
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+SUPER^.CyclicLogic();
+
+FOR i := 1 TO _MaxConveyorCount DO
+    ConvData[i].ConveyorID        := CONCAT('Conveyor No: ', UDINT_TO_STRING(i));
+    ConvData[i].ConveyorStateStr  := TO_STRING(ConvData[i].State);
+    ConvData[i].ActualPosition    := Convey_Motors[i].ActualPosition;
+    ConvData[i].CurrentTruss      := ConvData[i].TrussInfo.TrussID;
+    Convey_Motors[i].Velocity     := OutfeedMasterAutoSpeed;
+    Convey_Motors[i].Acceleration := OutfeedMasterAutoSpeed * 2;
+    Convey_Motors[i].Deceleration := OutfeedMasterAutoSpeed * 2;
+
+END_FOR
+
+_OutfeedConveyorStatus.Total    := _MaxConveyorCount;
+_OutfeedConveyorStatus.Occupied := 0;
+
+FOR i := _MaxConveyorCount TO 1 BY -1 DO
+    IF ConvData[i].State = E_Outfeed_Conveyor_State.OCCUPIED OR
+       ConvData[i].State = E_Outfeed_Conveyor_State.RECEIVING OR
+       (i = 1 AND ConvData[i].State = E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS) OR
+       (i = 1 AND ConvData[i].State = E_Outfeed_Conveyor_State.INDEX_PREP) OR
+       (i = _MaxConveyorCount AND ConvData[i].State = E_Outfeed_Conveyor_State.RESET) OR
+       (i = _MaxConveyorCount AND ConvData[i].State = E_Outfeed_Conveyor_State.AUTO_RETRACT) THEN
+        _OutfeedConveyorStatus.Occupied := _OutfeedConveyorStatus.Occupied + 1;
+    END_IF
+END_FOR
+
+IF _CurrentState <> E_PMLState.ePMLState_Suspended THEN
+    SuspendTON(IN := FALSE, PT := T#2S);
+
+END_IF
+
+IF ClearOccupiedOutfeedData THEN
+    FOR i := 1 TO _MaxConveyorCount DO
+
+        IF i = _MaxConveyorCount THEN
+            ConvData[i].State := E_Outfeed_Conveyor_State.IDLE;
+        ELSE
+            ConvData[i].State := E_Outfeed_Conveyor_State.RESET;
+
+        END_IF
+
+        ClearOccupiedOutfeedData := FALSE;
+    END_FOR
+END_IF
+
+Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Execute" Id="{0235ff6f-055d-41a5-ab0f-c44db2474f87}" FolderPath="Methods\WaitingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Execute
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    ErrorPresent : BOOL;
+	Manual_R_TRIG : R_TRIG;
+END_VAR
+
+VAR CONSTANT
+	TestConveyorSpeed : UDINT := 500;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ErrorPresent := FALSE;
+
+AllStopped := TRUE;
+
+FOR i := 1 TO _MaxConveyorCount DO
+    AllStopped := AllStopped AND (ConvData[i].State = E_Outfeed_Conveyor_State.IDLE OR ConvData[i].State = E_Outfeed_Conveyor_State.OCCUPIED);
+END_FOR
+
+IF EnableManualConveyorControl AND AllStopped THEN
+    ManualModeActive := TRUE;
+    HMIControl();
+ELSE
+    ManualModeActive := FALSE;
+
+    FOR i := 2 TO _MaxConveyorCount DO
+        ErrorPresent := Convey_Motors[i].Error;
+
+        IF ErrorPresent THEN
+            EXIT;
+        END_IF
+    END_FOR
+
+    IF _OutfeedAutostopOK AND _MainSafetyOK AND ErrorPresent = FALSE THEN
+        OutfeedConveyorLogic();
+    ELSE
+        ChangeState(E_PMLCommand.ePMLCommand_Suspend);
+    END_IF
+
+    StartUp := FALSE;
+    SUPER^.Execute();
+END_IF
+
+Manual_R_TRIG(CLK := ManualModeActive);
+
+IF Manual_R_TRIG.Q THEN
+    FOR i := 1 TO _MaxConveyorCount DO
+        ConvData[i].ManualControlSelected := FALSE;
+    END_FOR
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteStep" Id="{901ed34f-5653-45cb-b343-9b9eacb8d541}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD ExecuteStep : BOOL
+VAR_INPUT
+    Step : ST_CSV_Step;
+END_VAR
+
+VAR CONSTANT
+    PICK_DEVICE_WIDTH   : LREAL := 203;
+    DEFAULT_PICK_OFFSET : LREAL := 200;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExecuteStep := FALSE;
+
+CASE Step.seqName OF
+    E_CommandName.TrussInfo:
+        TrussInfoParse(Step, TrussInfo);
+        ExecuteStep := RunTrussInfo();
+
+    E_CommandName.PickPlace:
+        PickPlaceParse(Step, PickPlace);
+        ExecuteStep := RunPickPlace(PickPlace);
+
+    E_CommandName.IndexConveyor:
+        IndexConveyorParse(Step, IndexConveyor);
+        ExecuteStep := RunIndexConveyor();
+
+    E_CommandName.AssemblyEnd:
+        ExecuteStep := IndexFull();
+
+ELSE
+    ExecuteStep := TRUE;
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Held" Id="{e96169fd-db98-4668-b019-2b1e729e4dbc}" FolderPath="Methods\WaitingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Held
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _OutfeedAutostopOK AND _MainSafetyOK THEN
+    ChangeState(E_PMLCommand.ePMLCommand_Unhold);
+END_IF
+
+FOR i := 1 TO _MaxConveyorCount DO
+    ConvData[i].SubState := CONV_MOVE_ASSIGN;
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{3a3ac16f-ccad-4837-8028-b78e4b6b4066}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+
+VAR
+	AllReset : BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF ManualReset = FALSE THEN
+
+    FOR i := 1 TO _MaxConveyorCount DO
+
+        IF ManualControlConveyFWD THEN
+            IF ConvData[i].ManualControlSelected AND ConvData[i].State = E_Outfeed_Conveyor_State.IDLE THEN
+                Convey_Motors[i].MoveVelocity(ManualConveyorSpeed, TRUE);
+            ELSE
+                IF Convey_Motors[i].Busy THEN
+                    Convey_Motors[i].Stop();
+                END_IF
+            END_IF
+        ELSIF ManualControlConveyREV THEN
+            IF ConvData[i].ManualControlSelected AND ConvData[i].State = E_Outfeed_Conveyor_State.IDLE THEN
+                Convey_Motors[i].MoveVelocity(-ManualConveyorSpeed, TRUE);
+            ELSE
+                IF Convey_Motors[i].Busy THEN
+                    Convey_Motors[i].Stop();
+                END_IF
+            END_IF
+        ELSE
+
+            IF Convey_Motors[i].Busy THEN
+                Convey_Motors[i].Stop();
+            END_IF
+        END_IF
+
+    END_FOR
+ELSE
+	AllReset := TRUE;
+    FOR i := 1 TO _MaxConveyorCount DO
+       AllReset := MotorResetAndEnable(Convey_Motors[i]) AND AllReset; 
+    END_FOR
+	IF AllReset THEN
+		ManualReset := FALSE;
+	END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Idle" Id="{f7b542ae-a655-4581-becd-41537cf3c0ee}" FolderPath="Methods\WaitingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Idle
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _OutfeedAutostopOK AND _MainSafetyOK THEN
+    ChangeState(E_PMLCommand.ePMLCommand_Start);
+END_IF
+
+FOR i := 1 TO _MaxConveyorCount DO
+    ConvData[i].SubState := CONV_MOVE_ASSIGN;
+END_FOR
+
+EnableManualConveyorControl := FALSE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IndexFull" Id="{cfc73b18-66de-4876-9cb2-5dacac673356}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD IndexFull : BOOL
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    SubState : USINT := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IndexFull := FALSE;
+
+CASE SubState OF
+    0:
+        IF ConvData[1].State = E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS THEN
+            ConvData[1].State := E_Outfeed_Conveyor_State.INDEX_PREP;
+            SubState          := 10;
+        END_IF
+
+    10:
+        IndexFull := TRUE;
+        SubState  := 0;
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IndexHalf" Id="{e42a56ba-a31b-435e-8522-50fd3c8b413e}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD IndexHalf : BOOL
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    SubState : USINT := 0;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IndexHalf := FALSE;
+
+CASE SubState OF
+    0:
+        IF ConvData[1].State = E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS THEN
+            ConvData[1].State := E_Outfeed_Conveyor_State.INDEX_HALF_PREP;
+        ELSE
+            //waiting for conveyor 1 to be in a good spot
+        END_IF
+
+        IF ConvData[1].State = E_Outfeed_Conveyor_State.INDEXING_HALF THEN
+            SubState := 10;
+        END_IF
+
+    10:
+        IF ConvData[1].State = E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS THEN
+            IndexHalf := TRUE;
+            SubState  := 0;
+        END_IF
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{647d98f9-dd1d-4a2f-8a1e-b1eabdd8f5ec}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+    emptyTrussInfo           : ST_TrussInfo;
+
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(Shift_Motors);
+        RegisterComponent(ControlPendant);
+        RegisterComponent(LightStack);
+
+        FOR i := 1 TO _MaxConveyorCount DO
+            RegisterComponent(Convey_Motors[i]);
+            //RegisterComponent(Convey_Sensors[i]);
+            ConvData[i].SubState           := E_Outfeed_Conveyor_SubState.CONV_MOVE_ASSIGN;
+            ConvData[i].HalfIndexCompleted := FALSE;
+            ConvData[i].ReadyForSlideOut   := FALSE;
+            ConvData[i].ReadyToIndex       := FALSE;
+            ConvData[i].ReadyToIndexHalf   := FALSE;
+            ConvData[i].ReadyToOutfeed     := FALSE;
+            ConvData[i].ReadyToReceive     := FALSE;
+        END_FOR
+
+        LogModeChanges  := FALSE;
+        LogStateChanges := FALSE;
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        DescendantSequenceState := 1;
+
+    1:
+        CreateEvents();
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := 2;
+        END_IF
+
+    2:
+        Initialize := TRUE;
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MainSafetyOK" Id="{5944cfb1-e04d-4861-82cb-fa75ccaf49dd}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MainSafetyOK : bool]]></Declaration>
+      <Set Name="Set" Id="{95b28664-1e8e-4c58-b183-35af50b6010f}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MainSafetyOK := MainSafetyOK;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="MaxConveyorCount" Id="{7a45963d-ccd1-4c04-bba6-c1c7102a1634}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MaxConveyorCount : USINT]]></Declaration>
+      <Set Name="Set" Id="{ad88cf92-da9c-4c55-a035-294c95f7a87f}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MaxConveyorCount := MaxConveyorCount;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Monitoring" Id="{d1a6f0f5-edf9-4d08-847c-d44b16f52845}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[///////////////////////////////////////////////////////////////////////////////
+// 5. Outfeed autostop dropped
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT OutfeedJigAlarms[E_Outfeed_Jig.OutfeedSafetyDropped].bRaised) AND NOT _OutfeedAutostopOK THEN
+    // Raise alarm if Infeed is taking a long time to get a board
+    OutfeedJigAlarms[E_Outfeed_Jig.OutfeedSafetyDropped].Raise(0);
+ELSIF OutfeedJigAlarms[E_Outfeed_Jig.OutfeedSafetyDropped].bRaised AND _OutfeedAutostopOK THEN
+    // Clear when a board is found
+    OutfeedJigAlarms[E_Outfeed_Jig.OutfeedSafetyDropped].Clear(0, 0);
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////
+// 5. Outfeed autostop dropped
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT OutfeedJigAlarms[E_Outfeed_Jig.IndexingBlocked].bRaised) AND IndexingBlockedAlarm THEN
+    // Raise alarm if Infeed is taking a long time to get a board
+    OutfeedJigAlarms[E_Outfeed_Jig.IndexingBlocked].Raise(0);
+ELSIF OutfeedJigAlarms[E_Outfeed_Jig.IndexingBlocked].bRaised AND NOT IndexingBlockedAlarm THEN
+    // Clear when a board is found
+    OutfeedJigAlarms[E_Outfeed_Jig.IndexingBlocked].Clear(0, 0);
+END_IF;
+
+//////////////////////////////////////////////////////////////////////////
+// Wrap-up: Evaluate overall severity, then run the extended Monitoring
+//////////////////////////////////////////////////////////////////////////
+_CurrentAlarmSeverity := TcEventSeverity.Verbose;
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := OutfeedJigAlarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+// Finally, run the extended monitoring
+// SUPER^.Monitoring();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MotorsInit" Id="{529ee484-15d8-4b1d-a5b4-c2768658130e}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD MotorsInit : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MotorsInit := TRUE;
+
+FOR i := 1 TO _MaxConveyorCount DO
+    IF (_MainSafetyOK AND _AutostopOK AND i = 1) OR i > 1 THEN
+        MotorsInit := MotorResetAndEnable(Convey_Motors[i]) AND MotorsInit AND Shift_Motors.Reset();
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="NewTrussInfo" Id="{36839245-629a-4c4d-9943-77d96915aa81}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD NewTrussInfo : BOOL
+VAR_INPUT
+    ConveyorIndex : USINT;
+    NewTrussData  : ST_TrussInfo;
+END_VAR
+
+VAR
+    i              : USINT;
+    EmptyBoardData : ST_PickPlace;
+    EmptyTrussInfo : ST_TrussInfo;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO 50 DO
+    IF ConvData[1].BoardsPresent[i].ID = '' AND ConvData[1].BoardsPresent[i].Length = 0 THEN
+        ConvData[1].BoardsPresent[i] := EmptyBoardData;
+    END_IF
+END_FOR
+
+ConvData[1].TrussInfo := NewTrussData;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="OutfeedAutostopOK" Id="{6a294957-3892-4a95-9b18-ac46c39235da}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OutfeedAutostopOK : bool]]></Declaration>
+      <Set Name="Set" Id="{a5a95717-bfe7-44b7-8b10-3b1628457210}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_OutfeedAutostopOK := OutfeedAutostopOK;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="OutfeedConveyorLogic" Id="{d78a7dac-e142-4cbc-b871-ba2d98cbae60}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD OutfeedConveyorLogic : BOOL
+VAR_INPUT
+END_VAR
+
+VAR
+    EmptyBoardsPresent : ARRAY[1..50] OF ST_PickPlace;
+    EmptyTrussInfo     : ST_TrussInfo;
+    TempString         : STRING;
+END_VAR
+
+VAR_INST
+    Previous_SubState : ARRAY[1..7] OF E_Outfeed_Conveyor_SubState;
+    ClearConveyorTON  : TON;
+    Previous_State    : ARRAY[1..7] OF E_Outfeed_Conveyor_State;
+    Alarm_TON         : ARRAY[1..7] OF TON;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[LightStack.WhiteLight.TurnOn();
+ControlPendant.Light.TurnOff();
+
+FOR i := 1 TO _MaxConveyorCount DO
+    CASE ConvData[i].State OF
+        E_Outfeed_Conveyor_State.IDLE:
+            ConvData[i].SubState := CONV_MOVE_ASSIGN;
+
+            // check to see if index is requested
+            Alarm_TON[i](IN := FALSE, PT := T#5S);
+
+            IF i = _MaxConveyorCount THEN
+                ClearConveyorTON(IN := FALSE, PT := T#1000MS);
+                LightStack.Siren.TurnOff();
+                LightStack.AmberLight.TurnOff();
+            END_IF
+
+            IF i > 1 THEN
+                IF ConvData[i - 1].ReadyToIndex THEN
+                    ConvData[i].State := E_Outfeed_Conveyor_State.RECEIVE_PREP;
+                END_IF
+            END_IF
+
+        E_Outfeed_Conveyor_State.RECEIVE_PREP:
+            // assign absolute position based off relative distance, also sync up with indexing conveyor
+
+            IF Convey_Motors[i].Enabled AND Convey_Motors[i].Error = FALSE THEN
+                ConvData[i].TargetPos          := Convey_Motors[i].ActualPosition + ConvData[i].ConveyorLength;
+                ConvData[i - 1].ReadyToReceive := TRUE;
+
+                IF i = _MaxConveyorCount AND Shift_Motors.Retracted THEN
+                    ConvData[i].State := E_Outfeed_Conveyor_State.RECEIVING;
+                ELSE
+                    ConvData[i].State := E_Outfeed_Conveyor_State.RECEIVING;
+                END_IF
+            ELSE
+                MotorResetAndEnable(Convey_Motors[i]);
+            END_IF
+
+        E_Outfeed_Conveyor_State.RECEIVING:
+
+            // execute movement to position go to RESET when done
+
+            CASE ConvData[i].SubState OF
+                CONV_MOVE_ASSIGN:
+                    IF i = 2 THEN
+                        IF _AutostopOK AND Convey_Motors[i - 1].Axis.Status.DiscreteMotion THEN
+                            Convey_Motors[i].MoveAbsolute(ConvData[i].TargetPos, TRUE);
+                            ConvData[i].SubState := CONV_MOVE_DONE_CHECK;
+                        END_IF
+                    ELSE
+                        Convey_Motors[i].MoveAbsolute(ConvData[i].TargetPos, TRUE);
+                        ConvData[i].SubState := CONV_MOVE_DONE_CHECK;
+                    END_IF
+
+                CONV_MOVE_DONE_CHECK:
+                    IF Convey_Motors[i].InPosition AND NOT Convey_Motors[i].Busy THEN
+                        ConvData[i].SubState := CONV_DATA_CONFIRMATION;
+                    ELSIF Convey_Motors[i].Error OR (i = 2 AND (_AutostopOK = FALSE)) THEN
+                        ConvData[i].SubState := CONV_RESET_MOTOR;
+                    END_IF
+
+                CONV_DATA_CONFIRMATION:
+                    Alarm_TON[i](IN := TRUE, PT := T#5S);
+
+                    IF ConvData[i].TrussInfo.TrussID <> '' THEN
+                        ConvData[i].SubState := CONV_MOVE_ASSIGN;
+                        ConvData[i].State    := E_Outfeed_Conveyor_State.OCCUPIED;
+                        Alarm_TON[i](IN := FALSE, PT := T#5S);
+                    END_IF
+
+                    Convey_Motors[i].AlarmRaiseBasic(alarm := E_OutfeedConveyor.NoTrussData, raise := Alarm_TON[i].Q);
+
+                CONV_RESET_MOTOR:
+                    IF MotorResetAndEnable(Convey_Motors[i]) THEN
+                        ConvData[i].SubState := CONV_MOVE_ASSIGN;
+                    END_IF
+            END_CASE
+
+        E_Outfeed_Conveyor_State.OCCUPIED:
+            // check to see if boards can be moved forward
+
+            IF i < _MaxConveyorCount THEN
+                IF ConvData[i + 1].State = E_Outfeed_Conveyor_State.IDLE THEN
+                    ConvData[i].State := E_Outfeed_Conveyor_State.INDEX_PREP;
+                END_IF
+            ELSE
+                //turn on lights and permissions for extending and retracting conveyor out over table button pressed to clear data and let them retract
+
+                ControlPendant.Light.TurnOn();
+                LightStack.AmberLight.TurnOn();
+                Shift_Motors.Jog(JogFW := ControlPendant.ExtendSlideout.Button_Pressed, JogBW := ControlPendant.RetractSlideout.Button_Pressed);
+
+                IF Shift_Motors.Retracted = FALSE THEN
+                    ConvData[i].State := E_Outfeed_Conveyor_State.RESET;
+                ELSIF _InSimulation THEN
+                    ConvData[i].State := E_Outfeed_Conveyor_State.AUTO_RETRACT;
+                END_IF
+            END_IF
+
+        E_Outfeed_Conveyor_State.INDEX_HALF_PREP:
+            ConvData[i].TargetPos := Convey_Motors[i].ActualPosition + (ConvData[i].ConveyorLength / 2);
+            Alarm_TON[i](IN := TRUE, PT := T#5S);
+
+            // assign absolute position based off relative distance, also sync up with receiving conveyor
+            IF Convey_Motors[i].Enabled AND Convey_Motors[i].Error = FALSE THEN
+                ConvData[i].State := E_Outfeed_Conveyor_State.INDEXING_HALF;
+                Alarm_TON[i](IN := FALSE, PT := T#5S);
+            ELSE
+                IF _MainSafetyOK AND ((i > 1 AND _OutfeedAutostopOK) OR (i = 1 AND _AutostopOK)) THEN
+                    MotorResetAndEnable(Convey_Motors[i]);
+                END_IF
+            END_IF
+
+            IndexingBlockedAlarm := Alarm_TON[i].Q;
+
+        E_Outfeed_Conveyor_State.INDEXING_HALF:
+            // execute movement to position go to RESET when done
+
+            CASE ConvData[i].SubState OF
+                CONV_MOVE_ASSIGN:
+                    Convey_Motors[i].MoveAbsolute(ConvData[i].TargetPos, TRUE);
+                    ConvData[i].SubState := CONV_MOVE_DONE_CHECK;
+
+                CONV_MOVE_DONE_CHECK:
+                    IF Convey_Motors[i].InPosition AND NOT Convey_Motors[i].Busy THEN
+                        ConvData[i].State    := E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS;
+                        ConvData[i].SubState := CONV_MOVE_ASSIGN;
+                    ELSIF Convey_Motors[i].Error THEN
+                        ConvData[i].SubState := CONV_RESET_MOTOR;
+                    END_IF
+
+                CONV_RESET_MOTOR:
+                    IF MotorResetAndEnable(Convey_Motors[i]) THEN
+                        ConvData[i].SubState := CONV_MOVE_ASSIGN;
+                    END_IF
+
+            END_CASE
+
+        E_Outfeed_Conveyor_State.INDEX_PREP:
+            Alarm_TON[i](IN := TRUE, PT := T#5S);
+
+            IndexingBlockedAlarm := Alarm_TON[i].Q;
+
+            IF Convey_Motors[i].Enabled AND Convey_Motors[i].Error = FALSE THEN
+                ConvData[i].TargetPos    := Convey_Motors[i].ActualPosition + ConvData[i].ConveyorLength;
+                ConvData[i].ReadyToIndex := TRUE;
+
+                // assign absolute position based off relative distance, also sync up with receiving conveyor
+                IF ConvData[i + 1].State = E_Outfeed_Conveyor_State.RECEIVING THEN
+                    IF Convey_Motors[i].Enabled AND Convey_Motors[i].Error = FALSE THEN
+                        ConvData[i].State := E_Outfeed_Conveyor_State.INDEXING;
+                        Alarm_TON[i](IN := FALSE, PT := T#5S);
+                    ELSE
+                        MotorResetAndEnable(Convey_Motors[i]);
+                    END_IF
+                END_IF
+            ELSE
+                IF _MainSafetyOK AND ((i > 1 AND _OutfeedAutostopOK) OR (i = 1 AND _AutostopOK)) THEN
+                    MotorResetAndEnable(Convey_Motors[i]);
+                END_IF
+            END_IF
+
+        E_Outfeed_Conveyor_State.INDEXING:
+            // execute movement to position go to RESET when done
+
+            CASE ConvData[i].SubState OF
+                CONV_MOVE_ASSIGN:
+                    IF i = 1 THEN
+                        IF _AutostopOK THEN
+                            Convey_Motors[i].MoveAbsolute(ConvData[i].TargetPos, TRUE);
+                            ConvData[i].SubState := CONV_MOVE_DONE_CHECK;
+                        END_IF
+                    ELSE
+                        Convey_Motors[i].MoveAbsolute(ConvData[i].TargetPos, TRUE);
+                        ConvData[i].SubState := CONV_MOVE_DONE_CHECK;
+                    END_IF
+
+                CONV_MOVE_DONE_CHECK:
+                    IF Convey_Motors[i].InPosition AND NOT Convey_Motors[i].Busy THEN
+                        ConvData[i].SubState := CONV_DATA_CONFIRMATION;
+                    ELSIF Convey_Motors[i].Error OR (i = 1 AND _AutostopOK = FALSE) THEN
+                        ConvData[i].SubState := CONV_RESET_MOTOR;
+                    END_IF
+
+                CONV_DATA_CONFIRMATION:
+                    ConvData[i + 1].BoardsPresent := ConvData[i].BoardsPresent;
+                    ConvData[i + 1].TrussInfo     := ConvData[i].TrussInfo;
+
+                    IF ConvData[i + 1].State = E_Outfeed_Conveyor_State.OCCUPIED THEN
+                        ConvData[i].State    := E_Outfeed_Conveyor_State.RESET;
+                        ConvData[i].SubState := CONV_MOVE_ASSIGN;
+
+                        ConvData[i].ReadyToIndex := FALSE;
+                    END_IF
+
+                CONV_RESET_MOTOR:
+                    IF MotorResetAndEnable(Convey_Motors[i]) THEN
+                        ConvData[i].SubState := CONV_MOVE_ASSIGN;
+                    END_IF
+            END_CASE
+
+        E_Outfeed_Conveyor_State.RESET:
+            // reset data and start at IDLE
+            ConvData[i].SubState := CONV_MOVE_ASSIGN;
+
+            IF i < _MaxConveyorCount THEN
+                IF Convey_Motors[i].SimHoming(Motor := Convey_Motors[i], SimPos := 0) THEN
+                    ConvData[i].BoardsPresent := EmptyBoardsPresent;
+                    ConvData[i].TrussInfo     := EmptyTrussInfo;
+                    ConvData[i].ReadyToIndex  := FALSE;
+
+                    ConvData[i].State := E_Outfeed_Conveyor_State.IDLE;
+                END_IF
+            ELSE
+                //turn on lights and permissions for extending conveyor out over table, clear data and let them retract
+
+                ClearConveyorTON(IN := ControlPendant.ClearConveyor.Button_Pressed AND ControlPendant.RetractSlideout.Button_Pressed, PT := T#250MS);
+
+                ControlPendant.Light.TurnOn();
+                LightStack.AmberLight.TurnOn();
+                Shift_Motors.Jog(JogFW := ControlPendant.ExtendSlideout.Button_Pressed, JogBW := ControlPendant.RetractSlideout.Button_Pressed);
+
+                IF ClearConveyorTON.Q THEN
+                    ConvData[i].State := E_Outfeed_Conveyor_State.AUTO_RETRACT;
+                END_IF
+
+            END_IF
+
+        E_Outfeed_Conveyor_State.AUTO_RETRACT:
+            LightStack.AmberLight.Flash();
+            LightStack.Siren.Flash();
+
+            IF Shift_Motors.Retracted = FALSE AND _InSimulation = FALSE THEN
+                Shift_Motors.Jog(JogFW := FALSE, JogBW := TRUE);
+
+                IF ControlPendant.ExtendSlideout.Button_Pressed THEN
+                    ConvData[i].State := E_Outfeed_Conveyor_State.RESET;
+                END_IF
+            ELSE
+                Shift_Motors.Jog(JogFW := FALSE, JogBW := FALSE);
+
+                IF Convey_Motors[i].SimHoming(Motor := Convey_Motors[i], SimPos := 0) THEN
+                    ConvData[i].BoardsPresent := EmptyBoardsPresent;
+                    ConvData[i].TrussInfo     := EmptyTrussInfo;
+                    ConvData[i].ReadyToIndex  := FALSE;
+                    ConvData[i].State         := E_Outfeed_Conveyor_State.IDLE;
+                    ControlPendant.Light.TurnOff();
+                END_IF
+            END_IF
+
+        E_Outfeed_Conveyor_State.ERROR:
+
+        // Conveyor errored out, prevent indexing or receiving from other conveyors
+    END_CASE
+
+    IF ConvData[i].State <> Previous_State[i] THEN
+        TempString := '';
+        TempString := CONCAT(TempString, 'Conveyor ');
+        TempString := CONCAT(TempString, UDINT_TO_STRING(i));
+        TempString := CONCAT(TempString, ' State change to: ');
+        Trace(CONCAT(TempString, TO_STRING(ConvData[i].State)));
+    END_IF
+
+    Previous_State[i] := ConvData[i].State;
+
+    IF ConvData[i].SubState <> Previous_SubState[i] THEN
+        TempString := '';
+        TempString := CONCAT(TempString, 'Conveyor ');
+        TempString := CONCAT(TempString, UDINT_TO_STRING(i));
+        TempString := CONCAT(TempString, ' SubState change to: ');
+        Trace(CONCAT(TempString, TO_STRING(ConvData[i].SubState)));
+    END_IF
+
+    Previous_SubState[i] := ConvData[i].SubState;
+
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="OutfeedConveyorStatus" Id="{c89bbed6-5bb8-4105-ade3-555497d18491}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OutfeedConveyorStatus : ST_OutfeedConveyorStatus]]></Declaration>
+      <Get Name="Get" Id="{afe056fb-9b34-495c-946f-554d0592afaa}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[OutfeedConveyorStatus := _OutfeedConveyorStatus;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ParentState" Id="{011867d9-b8a6-45e4-aae9-5c57d0079b8e}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ParentState : E_PMLState]]></Declaration>
+      <Set Name="Set" Id="{f051c75b-8b08-4eba-ad5a-014d91193d25}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ParentState := ParentState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="PickPlace_Done_ENUM" Id="{19999877-938f-4a4d-8cab-ce3b5a4d2fe7}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PickPlace_Done_ENUM : E_WaitSync]]></Declaration>
+      <Set Name="Set" Id="{9020aae9-4da5-46e8-ad36-5e1a2739cec6}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_PickPlace_Done_ENUM := PickPlace_Done_ENUM;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="PickPlace_Ready_ENUM" Id="{257a6926-c5db-4b83-b4f6-60c4d9adc7e3}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PickPlace_Ready_ENUM : E_WaitSync]]></Declaration>
+      <Set Name="Set" Id="{f0ecbda9-8cff-4379-b3d4-4b47a9573ee8}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_PickPlace_Ready_ENUM := PickPlace_Ready_ENUM;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="PopulateBoardToArray" Id="{7b9ccacc-b5c7-4edd-bfaf-d0db3e1c576d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PopulateBoardToArray : BOOL
+VAR_INPUT
+    ConveyorIndex : USINT;
+    NewBoardData  : ST_PickPlace;
+END_VAR
+
+VAR
+    i : USINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO 50 DO
+    IF ConvData[1].BoardsPresent[i].ID = '' AND ConvData[1].BoardsPresent[i].Length = 0 THEN
+        ConvData[1].BoardsPresent[i] := NewBoardData;
+        EXIT;
+    END_IF
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunIndexConveyor" Id="{71fb726c-f439-4ee1-b8d1-8af7a5a88445}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD RunIndexConveyor : BOOL
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    SubState : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Convey_Motors[1].Enabled AND Convey_Motors[1].Error = FALSE THEN
+    IF IndexConveyor.ConvIndex MOD 2 = 0 THEN
+        RunIndexConveyor := IndexHalf();
+
+    ELSIF IndexConveyor.ConvIndex MOD 2 = 1 THEN
+        RunIndexConveyor := IndexFull();
+
+    END_IF
+ELSE
+    MotorResetAndEnable(Convey_Motors[1]);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunPickPlace" Id="{3018f5aa-bd9f-4ade-bbb0-72d320f874eb}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD RunPickPlace : BOOL
+VAR_INPUT
+    BoardData : reference to ST_PickPlace;
+END_VAR
+
+VAR
+    result : USINT;
+END_VAR
+
+VAR_INST
+    State : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE State OF
+    0:
+        IF RecoveryDetected OR (BoardData.Number = 1 AND ConvData[1].State = E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS) THEN
+            result := RaiseMessageBox(Header   := 'Old truss data detected',
+                                      Message1 := 'Conveyor has data from previous truss',
+                                      Message2 := 'Select Clear if conveyor is clear and ready for current truss',
+                                      Message3 := 'Select Index to send old truss out down the line',
+                                      Message4 := 'WARNING make sure conveyor is clear or has correct truss on it',
+                                      Message5 := 'If Index is pressed robot will place once truss is clear',
+                                      Btn1     := 'Clear',
+                                      Btn3     := 'Index');
+
+            IF result = 1 THEN
+                ConvData[1].State := E_Outfeed_Conveyor_State.IDLE;
+                RecoveryDetected  := FALSE;
+            ELSIF result = 3 THEN
+                ConvData[1].State := E_Outfeed_Conveyor_State.INDEX_PREP;
+                RecoveryDetected  := FALSE;
+            END_IF
+        ELSE
+            IF BoardData.Number = 1 THEN
+                IF ConvData[1].State = E_Outfeed_Conveyor_State.IDLE THEN
+                    IF WaitSync_Handler(_PickPlace_Ready_ENUM) THEN
+                        ConvData[1].State := E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS;
+                        State             := 1;
+                    END_IF
+                END_IF
+            ELSE
+                IF ConvData[1].State = E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS OR ConvData[1].State = E_Outfeed_Conveyor_State.IDLE THEN
+                    IF WaitSync_Handler(_PickPlace_Ready_ENUM) THEN
+                        State             := 1;
+                        ConvData[1].State := E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS;
+                    END_IF
+                END_IF
+            END_IF
+        END_IF
+
+    1:
+        IF ConvData[1].State = E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS THEN
+            IF WaitSync_Handler(_PickPlace_Done_ENUM) THEN
+                State := 2;
+            END_IF
+        END_IF
+
+    2:
+        FOR i := 1 TO 50 DO
+            IF ConvData[1].BoardsPresent[i].ID = '' AND ConvData[1].BoardsPresent[i].Length = 0 THEN
+                ConvData[1].BoardsPresent[i] := BoardData;
+                EXIT;
+            END_IF
+        END_FOR
+
+        ConvData[1].TrussInfo := TrussInfo;
+        RunPickPlace          := TRUE;
+        State                 := 0;
+
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RunTrussInfo" Id="{07843443-f100-430f-8215-0ba321990fba}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD RunTrussInfo : BOOL
+VAR_INPUT
+END_VAR
+
+VAR
+    i              : USINT;
+    EmptyBoardData : ST_PickPlace;
+    EmptyTrussInfo : ST_TrussInfo;
+    result         : USINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF ConvData[1].State = E_Outfeed_Conveyor_State.IDLE THEN
+    FOR i := 1 TO 50 DO
+        IF ConvData[1].BoardsPresent[i].ID = '' AND ConvData[1].BoardsPresent[i].Length = 0 THEN
+            ConvData[1].BoardsPresent[i] := EmptyBoardData;
+        END_IF
+    END_FOR
+
+    ConvData[1].TrussInfo := TrussInfo;
+    RunTrussInfo          := TRUE;
+ELSIF ConvData[1].State = E_Outfeed_Conveyor_State.BUILD_IN_PROGRESS THEN
+    //bad truss data, index forward or cancel if it's already cleared
+    result := RaiseMessageBox(Header   := 'Old truss data detected',
+                              Message1 := 'Conveyor has data from previous truss',
+                              Message2 := 'Select Clear if conveyor is clear and ready for current truss',
+                              Message3 := 'Select Index to send old truss out down the line',
+                              Message4 := 'WARNING make sure conveyor is clear or has correct truss on it',
+                              Message5 := 'If Index is pressed robot will place once truss is clear',
+                              Btn1     := 'Clear',
+                              Btn3     := 'Index');
+
+    IF result = 1 THEN
+        ConvData[1].State := E_Outfeed_Conveyor_State.IDLE;
+    ELSIF result = 3 THEN
+        ConvData[1].State := E_Outfeed_Conveyor_State.INDEX_PREP;
+    END_IF
+
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stopped" Id="{230ba210-9351-48c5-97c6-a4b7770e7a21}" FolderPath="Methods\WaitingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Stopped
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _OutfeedAutostopOK AND _MainSafetyOK THEN
+    ChangeState(E_PMLCommand.ePMLCommand_Reset);
+END_IF
+
+//skip when warm restart detected
+RecoveryDetected := NOT StartUp;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspended" Id="{b1e3fbb8-ef62-4a4b-8d81-482d4d1fee9c}" FolderPath="Methods\WaitingStates\">
+      <Declaration><![CDATA[METHOD PROTECTED Suspended
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SuspendTON(IN := TRUE, PT := T#2S);
+
+ControlPendant.Light.Flash();
+LightStack.WhiteLight.Flash();
+LightStack.Siren.TurnOff();
+
+IF _OutfeedAutostopOK AND _MainSafetyOK AND SuspendTON.Q THEN
+    ChangeState(E_PMLCommand.ePMLCommand_Unsuspend);
+END_IF
+
+FOR i := 1 TO _MaxConveyorCount DO
+    ConvData[i].SubState := CONV_MOVE_ASSIGN;
+END_FOR
+
+AllStopped := FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspending" Id="{845ae9ec-8023-4057-b221-d6b75b9f7b3f}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Suspending</b> state*)
+METHOD PROTECTED Suspending]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[FOR i := 1 TO _MaxConveyorCount DO
+    Convey_Motors[i].Stop();
+END_FOR
+
+SUPER^.Suspending();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unsuspending" Id="{e4ed1e4c-ee0b-4ff5-863f-f08320988fc2}" FolderPath="Methods\ActingStates\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Unsuspending</b> state*)
+METHOD PROTECTED Unsuspending]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _OutfeedAutostopOK AND _MainSafetyOK THEN
+    SUPER^.Unsuspending();
+ELSE
+    StateComplete();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

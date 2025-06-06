@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_BEPointDefinitions" Id="{a4e60e0e-6251-467e-bd37-a487a5441484}">
+    <Declaration><![CDATA[TYPE
+    ST_BEPointDefinitions : STRUCT
+        MinCarriagePos  : REAL;
+        Infeed          : REAL;
+        PrePress        : REAL;
+        PostPress       : REAL;
+        AssemblyHandoff : REAL;
+        PickPoint_1     : REAL;
+        MaxCarriagePos  : REAL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_EquipmentModule_SR" Id="{d663814b-0dd5-4c05-8ee9-d9773ef737eb}">
+    <Declaration><![CDATA[INTERFACE I_EquipmentModule_SR EXTENDS I_PackML_BaseModule]]></Declaration>
+    <Property Name="EquipmentModuleID" Id="{aeff10e9-5bc3-42e0-bd24-7b6a3103bb95}">
+      <Declaration><![CDATA[PROPERTY EquipmentModuleID : E_EM_Index;]]></Declaration>
+      <Get Name="Get" Id="{f734c3d3-2b44-410a-88d3-1b60e7d95c75}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{0d1cab90-1e3c-4164-9234-459c105cd813}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="InSimulation" Id="{ff9c8eaf-dfa5-416b-b4c5-c6ed5a3e6add}">
+      <Declaration><![CDATA[PROPERTY InSimulation : BOOL]]></Declaration>
+      <Set Name="Set" Id="{291cfa6e-3fd2-41f2-9fe7-a70cb02d95ba}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="SafetyOK" Id="{566ec046-912c-42db-96cc-8cfb6cddf5c7}">
+      <Declaration><![CDATA[PROPERTY SafetyOK : BOOL]]></Declaration>
+      <Set Name="Set" Id="{966bba5b-9b8b-40ab-8c92-e5e90b0d7d0b}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Method Name="SimulationOff" Id="{3e2deaa5-a795-4d7d-a053-15eee544bf9c}">
+      <Declaration><![CDATA[METHOD SimulationOff : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="SimulationOn" Id="{bb03762e-6c33-4760-9d9f-bc19309e2d8f}">
+      <Declaration><![CDATA[METHOD SimulationOn : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_AssemblyData" Id="{9e0d8cb8-2c7d-41d7-bbfc-d05bff2f2bac}">
+    <Declaration><![CDATA[TYPE
+    ST_AssemblyData : STRUCT
+        Boards : ARRAY[1..MAX_NUMBER_OF_BOARDS] OF ST_BoardData;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

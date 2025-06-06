@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_EquipmentModuleLog" Id="{eab0518a-f595-433c-82d0-c38b7745ba01}">
+    <Declaration><![CDATA[TYPE
+    ST_EquipmentModuleLog : STRUCT
+        Timestamp   : DT;
+        ModuleName  : STRING(32);
+        PackMLState : STRING(32);
+        Message     : STRING(255);
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

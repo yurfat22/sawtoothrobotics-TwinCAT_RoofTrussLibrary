@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MGBDoor_HMIStatus" Id="{9caa836a-89c3-4a6b-998d-6ddc821835ee}">
+    <Declaration><![CDATA[TYPE
+    ST_MGBDoor_HMIStatus : STRUCT
+		DoorName : STRING;
+		AutoStopStatus_Usint : USINT;
+		AutoStopStatus_Str : STRING;
+		EStopStatus_Usint : USINT;
+		EStopStatus_Str : STRING;		
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

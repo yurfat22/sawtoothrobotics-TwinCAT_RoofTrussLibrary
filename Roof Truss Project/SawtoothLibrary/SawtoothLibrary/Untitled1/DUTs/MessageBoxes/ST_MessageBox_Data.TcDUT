@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MessageBox_Data" Id="{d9fa6329-e82e-4314-8db2-2b4b688dfaa9}">
+    <Declaration><![CDATA[TYPE
+    ST_MessageBox_Data : STRUCT
+        Equipment_Module        : E_EM_Index;
+        Equipment_Module_String : STRING;
+        TimeStamp               : STRING;
+        Header                  : STRING[80];
+        Icon                    : USINT;
+        Severity                : TcEventSeverity;
+        Messages                : ST_MessageBox_Messages;
+        Buttons                 : ST_MessageBox_Buttons;
+        ErrorPresent            : BOOL;
+        ErrorNumber             : UINT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_PackML_Control" Id="{3bda1bbe-87e4-4b21-95e5-eda3aa5a930c}">
+    <Declaration><![CDATA[TYPE
+    ST_PackML_Control : STRUCT
+        CurrentMode  : E_PMLUnitMode;
+        ModeCommand  : E_PMLUnitMode;
+        CurrentState : E_PMLState;
+        StateCommand : E_PMLCommand;
+        ModeNames    : ARRAY[0..31] OF STRING;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

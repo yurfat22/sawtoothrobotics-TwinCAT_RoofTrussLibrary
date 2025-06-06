@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_DualChannel_HMIStatus" Id="{271a1248-9541-4000-9842-7b2ce5624e1b}">
+    <Declaration><![CDATA[TYPE
+    ST_DualChannel_HMIStatus : STRUCT
+		Name : STRING;
+		Status_Usint : USINT;
+		Status_Str : STRING;		
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

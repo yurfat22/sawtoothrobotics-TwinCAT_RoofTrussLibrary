@@ -1,0 +1,1232 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Press" Id="{b03b88bc-45ba-4a25-9c9c-a77119354b13}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Press EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    ipSubModules_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_PackML_BaseModule := [];
+
+    // Component definitions here
+
+    Top_Press    : FB_Component_BasicSlaveAxis_SoE := (Name := 'Top Press');
+    Bottom_Press : FB_Component_BasicSlaveAxis_SoE := (Name := 'Bottom Press');
+
+    Top_PressCmds_Extra    : ST_MotorControls_NonStandard;
+    Bottom_PressCmds_Extra : ST_MotorControls_NonStandard;
+
+    //Data for recipe
+
+    TopPressRecipe    : ST_PressRecipe;
+    BottomPressRecipe : ST_PressRecipe;
+    Plates            : ST_Plates;
+    DetailIndex       : UDINT := 1;
+    Detail_Step       : E_Press_States;
+
+    _NailplateCountData_Ready : BOOL;
+    _NailplateCountData_Sent  : BOOL;
+    _DriveMode                : SPT_Motion_Control.E_DriveOperationMode;
+    _DoublePickDataToPass     : BOOL;
+    _DoublePickData_Ready     : BOOL;
+    _DoublePickData_Sent      : BOOL;
+    _BoardDataToPass          : ST_BoardInfo;
+END_VAR
+
+VAR CONSTANT
+
+    // Report parameters 
+
+    FAULTID  : INT := 1; //Fault number 
+    CURRTEMP : INT := 2; // current temperature of the sealing bar 
+    CURRPOS  : INT := 3; // current position of the sealing bar  
+
+    //Alarms
+
+    PREPLATE_ALARM_COUNT : INT := 6;
+END_VAR
+
+VAR
+    FB_Reset_SoE_Drive : FB_SoEReset;
+
+    //Robot Signals
+
+    RobotClearOfPress AT %I* : BOOL := TRUE;
+
+    _NailplateDataToPass : ST_PlateInfo;
+
+    TopPressDriveOpMode_Read    : SPT_Motion_Control.MC_ReadDriveOperationMode;
+    TopPressDriveOpMode_Write   : SPT_Motion_Control.MC_WriteDriveOperationMode;
+    TopPressDriveOpMode_Options : SPT_Motion_Control.ST_DriveOperationModeOptions;
+
+    BottomPressDriveOpMode_Read    : SPT_Motion_Control.MC_ReadDriveOperationMode;
+    BottomPressDriveOpMode_Write   : SPT_Motion_Control.MC_WriteDriveOperationMode;
+    BottomPressDriveOpMode_Options : SPT_Motion_Control.ST_DriveOperationModeOptions;
+
+    _PressRobotPermissionToEnter : ST_MediatorInterface;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{576e6ff0-2e76-4547-aa07-0057ee5688af}" />
+    <Folder Name="Methods" Id="{26dc020c-98a6-4ac9-84c5-3dc3188fa7bc}">
+      <Folder Name="Acting States" Id="{d6ff54b8-b2bd-4522-b993-0c95ecbf1da8}" />
+      <Folder Name="CommandSteps" Id="{51e7122b-4eab-4c85-93b6-ebf252f25e06}" />
+      <Folder Name="Waiting States" Id="{9c273445-cd6c-4ce3-9052-242e693f4d54}" />
+    </Folder>
+    <Folder Name="Properties" Id="{67fabf7b-8c4a-400a-82ca-f1cf66d808e8}" />
+    <Method Name="Aborting" Id="{15660131-5593-4431-baae-35f4aa414604}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Aborting
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// CASE SequenceState OF
+//     0:
+//         NoStateTasksToComplete := FALSE;
+// 
+//         IF Bottom_Press.Enabled AND NOT Bottom_Press.Error AND Top_Press.Enabled AND NOT Top_Press.Error THEN
+//             SequenceState := SequenceState + 10;
+//             Trace('SequenceState: 10 - Both presses enabled'); // Log state transition when both presses are enabled
+//         ELSE
+//             SequenceState := 50;
+//             Trace('SequenceState: 50 - One or both presses not enabled'); // Log state transition when one or both presses are not enabled
+//         END_IF
+// 
+//     10:
+//         Bottom_Press.Velocity     := BottomPressRecipe.Axis.Velocity;
+//         Bottom_Press.Acceleration := BottomPressRecipe.Axis.Acceleration;
+//         Bottom_Press.MoveAbsolute(Position := BottomPressRecipe.OpenPosition, TRUE);
+//         SequenceState := SequenceState + 10;
+//         Trace('SequenceState: 20 - Main press moving to open position'); // Log state transition and main press movement
+//     20:
+//         IF Bottom_Press.InPosition AND NOT Bottom_Press.Busy THEN
+//             SequenceState := SequenceState + 10;
+//             Trace('SequenceState: 30 - Main press in position'); // Log state transition when main press is in position
+//         END_IF
+// 
+//     30:
+//         Top_Press.Velocity     := TopPressRecipe.Axis.Velocity;
+//         Top_Press.Acceleration := TopPressRecipe.Axis.Acceleration;
+//         Top_Press.MoveAbsolute(Position := TopPressRecipe.OpenPosition, TRUE);
+//         SequenceState := SequenceState + 10;
+//         Trace('SequenceState: 40 - Aux press moving to open position'); // Log state transition and aux press movement
+//     40:
+//         IF Top_Press.InPosition AND NOT Top_Press.Busy THEN
+//             SequenceState := SequenceState + 10;
+//             Trace('SequenceState: 50 - Aux press in position'); // Log state transition when aux press is in position
+//         END_IF
+// 
+//     50:
+//         IF Bottom_Press.Error THEN
+//             Bottom_Press.Reset();
+//         END_IF
+// 
+//         IF Top_Press.Error THEN
+//             Top_Press.Reset();
+//         END_IF
+// 
+//         Bottom_Press.Stop();
+//         Top_Press.Stop();
+// 
+//         IF Bottom_Press.Stopped AND Top_Press.Stopped THEN
+//             SequenceState := SequenceState + 10;
+//             Trace('SequenceState: 60 - Both presses stopped'); // Log state transition when both presses are stopped
+//         END_IF
+// 
+//     60:
+//         // Disable here
+//         Bottom_Press.Disable();
+//         Top_Press.Disable();
+//         //Trace('SequenceState: 60 - Both presses disabled'); // Log presses disabled state
+// 
+//         // Check not enabled here
+//         IF (NOT Bottom_Press.Enabled) AND (NOT Top_Press.Enabled) THEN
+//             SequenceState := SequenceState + 10;
+//             Trace('SequenceState: 70 - Both presses not enabled'); // Log state transition when both presses are not enabled
+//         END_IF
+// 
+//     70:
+//         StateTasksComplete := TRUE;
+// 
+//     //Trace('StateTasksComplete: TRUE'); // Log state tasks completion
+// END_CASE
+
+Bottom_Press.Disable();
+Top_Press.Disable();
+
+SUPER^.Aborting();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AssemblyEnd" Id="{8b9bc515-48b5-47b0-91be-2afc65543ca9}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD AssemblyEnd : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="AssemblyStart" Id="{5e6356f1-6d85-4244-852d-a5a2c3ee1864}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD AssemblyStart : BOOL]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="BoardDataToPass" Id="{d1dacf37-0f3f-4a27-bd46-12bfdf4ab75f}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY BoardDataToPass : ST_BoardInfo]]></Declaration>
+      <Get Name="Get" Id="{d2735a23-272f-43fd-bb1b-ef57f4a3b9ab}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[BoardDataToPass := _BoardDataToPass;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Clearing" Id="{1ac74a92-0065-4876-b400-9c755d07e9cc}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Clearing
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// CASE SequenceState OF
+//     0:
+//         NoStateTasksToComplete := FALSE;
+//         SequenceState          := SequenceState + 10;
+// 
+//         //Trace('SequenceState: 10 - Initial state tasks set, moving to next state'); // Log initial state setup
+//     10:
+//         // Enable here
+//         //         Bottom_Press_Hydro.Relax();
+//         //         Top_Press_Hydro.Relax();
+//         SequenceState := SequenceState + 10;
+// 
+//         //Trace('SequenceState: 20 - Main and Aux press hydraulics relaxed'); // Log hydraulic relaxation
+//     20:
+//         StateTasksComplete := TRUE;
+// 
+//     //Trace('StateTasksComplete: TRUE - State tasks completed'); // Log state tasks completion
+// END_CASE
+
+SUPER^.Clearing();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{54f422e9-71e2-45fb-adf6-115b9bd3f21d}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR
+
+VAR
+    LowLimit  : STRING;
+    HighLimit : STRING;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+AllowHMIControl(ThisModuleOnly:=FALSE);
+
+SUPER^.CyclicLogic();
+CyclicLogicSimulation();
+
+BottomPressRecipe.AtTop := Bottom_Press.ActualPosition < BottomPressRecipe.OpenPosition + 10;
+TopPressRecipe.AtTop    := Top_Press.ActualPosition < TopPressRecipe.OpenPosition + 10;
+
+BottomPressRecipe.AtWork := Bottom_Press.ActualPosition > BottomPressRecipe.ClosedPosition - 10;
+TopPressRecipe.AtWork    := Top_Press.ActualPosition > TopPressRecipe.ClosedPosition - 10;
+
+BottomPressRecipe.State_Str := TO_STRING(BottomPressRecipe.State);
+BottomPressRecipe.State_Previous_Str := TO_STRING(BottomPressRecipe.State_Previous);
+BottomPressRecipe.State_Response_Str := TO_STRING(BottomPressRecipe.State_Response);
+
+TopPressRecipe.State_Str := TO_STRING(TopPressRecipe.State);
+TopPressRecipe.State_Previous_Str := TO_STRING(TopPressRecipe.State_Previous);
+TopPressRecipe.State_Response_Str := TO_STRING(TopPressRecipe.State_Response);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="DoublePickData_Ready" Id="{3802cd00-cd78-4f24-a6a8-35c9dafb0244}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY DoublePickData_Ready : bool]]></Declaration>
+      <Get Name="Get" Id="{71d2b4f8-51f6-4a49-ad1d-b52beedb2f1b}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[DoublePickData_Ready := _DoublePickData_Ready;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="DoublePickData_Sent" Id="{62903962-2355-4f40-99bd-62db9397bf2b}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY DoublePickData_Sent : bool]]></Declaration>
+      <Get Name="Get" Id="{700cd2f5-472c-48ac-b3de-b273f1614a4f}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[DoublePickData_Sent := _DoublePickData_Sent;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{ac243395-6bce-4239-a23b-b0fd899e9d16}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_DoublePickData_Sent := DoublePickData_Sent;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="DoublePickDataToPass" Id="{0e61c8a9-0165-4f73-a0e6-783333784ee8}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY DoublePickDataToPass : bool]]></Declaration>
+      <Get Name="Get" Id="{3d7f59db-78e4-414a-a264-c9624cc97175}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[DoublePickDataToPass := _DoublePickDataToPass;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="DoublePickNailPlatePosCheck" Id="{b220339c-b758-4635-8638-24cdfdcc75b9}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD DoublePickNailPlatePosCheck : BOOL
+VAR_INPUT
+    PlateInfo : REFERENCE TO ST_Plates;
+    Length    : REFERENCE TO REAL;
+END_VAR
+
+VAR
+    MaxNailplatePos : lreal;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[DoublePickNailPlatePosCheck := FALSE;
+
+FOR i := 1 TO MAX_NUMBER_OF_PLATES DO
+    MaxNailplatePos := MAX(PlateInfo.Plates[i].PlatePlaceX, MaxNailplatePos);
+END_FOR
+
+IF Length > Global.DOUBLEPICK_MIN_LENGTH AND (Length - MaxNailplatePos) < Global.DOUBLEPICK_MIN_LENGTH AND MaxNailplatePos > 1000 THEN
+    DoublePickNailPlatePosCheck := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Execute" Id="{c38cfba4-1879-4ade-b82f-ebb8277f6247}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Execute
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    dwellTime         : TON;
+    EDGEPOS_InitCycle : R_TRIG;
+END_VAR
+
+VAR
+    TestCycle : BOOL := FALSE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE _CurrentMode OF
+    //=================================PRODUCTION MODE==================================
+    E_PMLUnitMode.ePMLUnitMode_Production:
+
+        PressLogic(Bottom_Press, BottomPressRecipe);
+        PressLogic(Top_Press, TopPressRecipe);
+
+        //=================================MAINTENANCE & MANUAL MODE==================================        
+    E_PMLUnitMode.ePMLUnitMode_Maintenance, E_PMLUnitMode.ePMLUnitMode_Manual:
+        ; // No specific actions, just log the mode
+
+    //Trace('Mode: Maintenance or Manual - No actions taken'); // Log maintenance or manual mode entry
+END_CASE
+
+SUPER^.Execute();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteDetail" Id="{8a568f38-8829-4a7d-8312-434118c1f4fb}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD ExecuteDetail : BOOL
+VAR_INPUT
+    DetailToRun : UDINT;
+END_VAR
+
+VAR_INST
+    Previous_State : E_Press_States;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExecuteDetail := FALSE;
+
+CASE Detail_Step OF
+    PRESS_INIT:
+        IF Plates.Plates[DetailToRun].TopOrBottom = 'Top' THEN
+            TopPressRecipe.State    := E_RamState.rsFULL_RETRACT;
+            BottomPressRecipe.State := E_RamState.rsEXTEND_TO_BACKER;
+
+            IF TopPressRecipe.State_Response = E_RamState.rsFULL_RETRACT AND BottomPressRecipe.State_Response = E_RamState.rsEXTEND_TO_BACKER THEN
+                Detail_Step := NP_READY_TO_PLACE_WS;
+            END_IF
+        ELSIF Plates.Plates[DetailToRun].TopOrBottom = 'Bottom' THEN
+            TopPressRecipe.State    := E_RamState.rsEXTEND_TO_BACKER;
+            BottomPressRecipe.State := E_RamState.rsFULL_RETRACT;
+
+            IF TopPressRecipe.State_Response = E_RamState.rsEXTEND_TO_BACKER AND BottomPressRecipe.State_Response = E_RamState.rsFULL_RETRACT THEN
+                Detail_Step := NP_READY_TO_PLACE_WS;
+            END_IF
+        END_IF
+
+    NP_READY_TO_PLACE_WS:
+        IF WaitSync_Handler(E_WaitSync.NAILPLATE_READY_TO_PLACE) THEN
+            Detail_Step := ROBOT_PERMISSION_REQUEST;
+        END_IF
+
+    ROBOT_PERMISSION_REQUEST:
+        _PressRobotPermissionToEnter.Request := TRUE;
+
+        IF _PressRobotPermissionToEnter.Permission THEN
+            Detail_Step := ROBOT_PERMISSION_GRANTED_WS;
+        END_IF
+
+    ROBOT_PERMISSION_GRANTED_WS:
+        IF WaitSync_Handler(E_WaitSync.PRESS_ROBOT_PERMISSION_GRANTED) THEN
+            Detail_Step := NP_PLACED_WS;
+        END_IF
+
+    NP_PLACED_WS:
+        IF WaitSync_Handler(E_WaitSync.NAILPLATE_PLACED) THEN
+            Detail_Step := NP_PREP_POS;
+        END_IF
+
+    NP_PREP_POS:
+        IF Plates.Plates[DetailToRun].TopOrBottom = 'Top' THEN
+            TopPressRecipe.State := E_RamState.rsEXTEND_TO_CLOSED_PREP;
+
+            IF TopPressRecipe.State_Response = E_RamState.rsEXTEND_TO_CLOSED_PREP THEN
+                Detail_Step := READY_FOR_BOARD_WS;
+            END_IF
+        ELSIF Plates.Plates[DetailToRun].TopOrBottom = 'Bottom' THEN
+            BottomPressRecipe.State := E_RamState.rsEXTEND_TO_CLOSED_PREP;
+
+            IF BottomPressRecipe.State_Response = E_RamState.rsEXTEND_TO_CLOSED_PREP THEN
+                Detail_Step := READY_FOR_BOARD_WS;
+            END_IF
+        END_IF
+
+    READY_FOR_BOARD_WS:
+        _PressRobotPermissionToEnter.Request := FALSE;
+
+        IF WaitSync_Handler(E_WaitSync.CARRIAGE2_PRESS_READY_FOR_BOARD) THEN
+            Detail_Step := BOARD_IN_POSITION_WS;
+        END_IF
+
+    BOARD_IN_POSITION_WS:
+        IF WaitSync_Handler(E_WaitSync.CARRIAGE2_PRESS_BOARD_IN_POSITION) THEN
+            Detail_Step := PRESSING_NAILPLATE;
+        END_IF
+
+    PRESSING_NAILPLATE:
+        IF Plates.Plates[DetailToRun].TopOrBottom = 'Top' THEN
+            TopPressRecipe.State    := E_RamState.rsEXTEND_TO_PRESSURE;
+            BottomPressRecipe.State := E_RamState.rsEXTEND_TO_CLOSED;
+
+            IF TopPressRecipe.State_Response = E_RamState.rsEXTEND_TO_PRESSURE AND BottomPressRecipe.State_Response = E_RamState.rsEXTEND_TO_CLOSED
+            THEN
+                Detail_Step := RETRACTING_FOR_INDEX;
+            END_IF
+        ELSIF Plates.Plates[DetailToRun].TopOrBottom = 'Bottom' THEN
+            BottomPressRecipe.State := E_RamState.rsEXTEND_TO_PRESSURE;
+            TopPressRecipe.State    := E_RamState.rsEXTEND_TO_CLOSED;
+
+            IF BottomPressRecipe.State_Response = E_RamState.rsEXTEND_TO_PRESSURE AND TopPressRecipe.State_Response = E_RamState.rsEXTEND_TO_CLOSED
+            THEN
+                Detail_Step := RETRACTING_FOR_INDEX;
+            END_IF
+        END_IF
+
+    RETRACTING_FOR_INDEX:
+        TopPressRecipe.State    := E_RamState.rsRETRACT_FOR_INDEX;
+        BottomPressRecipe.State := E_RamState.rsRETRACT_FOR_INDEX;
+
+        IF TopPressRecipe.State_Response = E_RamState.rsRETRACT_FOR_INDEX AND BottomPressRecipe.State_Response = E_RamState.rsRETRACT_FOR_INDEX THEN
+            Detail_Step := NP_DONE_WS;
+        END_IF
+
+    NP_DONE_WS:
+        IF WaitSync_Handler(E_WaitSync.CARRIAGE2_PRESS_NAILPLATE_DONE) THEN
+            ExecuteDetail := TRUE;
+            Detail_Step   := PRESS_INIT;
+        END_IF
+
+END_CASE
+
+IF Detail_Step <> Previous_State THEN
+    Trace(CONCAT('Press StepDetail state change to: ', TO_STRING(Detail_Step)));
+END_IF
+
+Previous_State := Detail_Step;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExecuteStep" Id="{6da66cf3-dad3-46c7-a492-82b013ce5ed4}" FolderPath="Methods\CommandSteps\">
+      <Declaration><![CDATA[METHOD ExecuteStep : BOOL
+VAR_INPUT
+    Step : ST_CSV_Step;
+END_VAR
+
+VAR
+    EmptyPlates : ST_Plates;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ExecuteStep := FALSE;
+
+CASE Step.seqName OF
+
+    E_CommandName.BoardInfo:
+		BoardInfoParse(Step := Step, StepOut := _BoardDataToPass);
+
+//         _NailplateCountDataToPass := STRING_TO_UDINT(Step.Details[1].Datas[6]);
+//         _BoardLength              := STRING_TO_LREAL(Step.Details[1].Datas[5]);
+
+        IF _BoardDataToPass.TotalPlates = 0 THEN
+            IF _NailplateCountData_Sent = FALSE THEN
+                _NailplateCountData_Sent := WaitSync_Handler(E_WaitSync.HANDOFF2_PRESS_TOTAL_NP_COUNT);
+           ELSE
+                IF WaitSync_Handler(E_WaitSync.HANDOFF2_PRESS_DOUBLE_PICK) THEN
+                    ExecuteStep               := TRUE;
+                    _NailplateCountData_Ready := FALSE;
+                    _NailplateCountData_Sent  := FALSE;
+                    _DoublePickData_Sent      := FALSE;
+                    _DoublePickData_Ready     := FALSE;
+                END_IF
+            END_IF
+        ELSE
+            _DoublePickData_Sent  := FALSE;
+            _DoublePickData_Ready := FALSE;
+
+            IF WaitSync_Handler(E_WaitSync.HANDOFF2_PRESS_TOTAL_NP_COUNT) THEN
+                ExecuteStep := TRUE;
+// 		 		Trace(CONCAT('HANDOFF2_PRESS_TOTAL_NP_COUNT done for board:  ',Concat(_BoardDataToPass.BoardID,CONCAT(' -> ',INT_TO_STRING(_BoardDataToPass.BoardNumber)))));
+            END_IF
+        END_IF
+		Plates := EmptyPlates;
+    E_CommandName.NailPlate:
+        NailPlateParse(Step, Plates);
+        _DoublePickDataToPass := DoublePickNailPlatePosCheck(Plates, _BoardDataToPass.BoardLength);
+
+        IF _DoublePickData_Sent = FALSE THEN
+            _DoublePickData_Sent := WaitSync_Handler(E_WaitSync.HANDOFF2_PRESS_DOUBLE_PICK);
+        ELSE
+            _NailplateDataToPass      := Plates.Plates[DetailIndex];
+            IF ExecuteDetail(DetailIndex) THEN
+                DetailIndex := DetailIndex + 1;
+            END_IF
+
+
+            IF DetailIndex > Step.DetailCount THEN
+                DetailIndex               := 1;
+                ExecuteStep               := TRUE;
+                _DoublePickData_Sent      := FALSE;
+                _DoublePickData_Ready     := FALSE;
+                _NailplateCountData_Ready := FALSE;
+                _NailplateCountData_Sent  := FALSE;
+           END_IF
+        END_IF
+
+ELSE
+    ExecuteStep := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{e6d40749-6176-4975-b07b-91cd5163952b}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    PowerOnCommand_Top     : BOOL;
+    PowerOffCommand_Top    : BOOL;
+    PowerOnCommand_Bottom  : BOOL;
+    PowerOffCommand_Bottom : BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Top_PressCmds_Extra.Temp_R_Trig[1](CLK := Top_PressCmds_Extra.MotorCmd[1]);
+
+PowerOnCommand_Top := Top_PressCmds_Extra.Temp_R_Trig[1].Q AND PowerOnCommand_Top = FALSE;
+
+IF PowerOnCommand_Top THEN
+    IF Top_Press.Enable() THEN
+        PowerOnCommand_Top := FALSE;
+    END_IF
+END_IF
+
+Top_PressCmds_Extra.Temp_R_Trig[2](CLK := Top_PressCmds_Extra.MotorCmd[2]);
+
+PowerOffCommand_Top := Top_PressCmds_Extra.Temp_R_Trig[2].Q AND PowerOffCommand_Top = FALSE;
+
+IF PowerOffCommand_Top THEN
+    IF Top_Press.Disable() THEN
+        PowerOffCommand_Top := FALSE;
+    END_IF
+END_IF
+
+Bottom_PressCmds_Extra.Temp_R_Trig[1](CLK := Bottom_PressCmds_Extra.MotorCmd[1]);
+
+PowerOnCommand_Bottom := Bottom_PressCmds_Extra.Temp_R_Trig[1].Q AND PowerOnCommand_Bottom = FALSE;
+
+IF PowerOnCommand_Bottom THEN
+    IF Bottom_Press.Enable() THEN
+        PowerOnCommand_Bottom := FALSE;
+    END_IF
+END_IF
+
+Bottom_PressCmds_Extra.Temp_R_Trig[2](CLK := Bottom_PressCmds_Extra.MotorCmd[2]);
+
+PowerOffCommand_Bottom := Bottom_PressCmds_Extra.Temp_R_Trig[2].Q AND PowerOffCommand_Bottom = FALSE;
+
+IF PowerOffCommand_Bottom THEN
+    IF Bottom_Press.Disable() THEN
+        PowerOffCommand_Bottom := FALSE;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Holding" Id="{0d335555-7be1-42ee-af86-9449a0d7c9f0}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Holding
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// CASE _CurrentMode OF
+// =================================PRODUCTION MODE==================================
+//     E_PMLUnitMode.ePMLUnitMode_Production:
+//         CASE SequenceState OF
+//             0:
+//                 NoStateTasksToComplete := FALSE;
+//                 SequenceState          := SequenceState + 10;
+// 
+//                 //Trace('SequenceState: 10 - Initial state tasks set, moving to next state'); // Log initial state setup
+//             10:
+//                 //                 Bottom_Press_Hydro.Relax();
+//                 //                 Top_Press_Hydro.Relax();
+//                 Bottom_Press.Stop();
+//                 Top_Press.Stop();
+// 
+//                 IF Bottom_Press.Stopped AND Top_Press.Stopped THEN
+//                     SequenceState := SequenceState + 10;
+//                     //Trace('SequenceState: 20 - Both presses stopped'); // Log state transition when both presses are stopped
+//                 END_IF
+// 
+//             20:
+//                 // Disable here
+//                 Bottom_Press.Disable();
+//                 Top_Press.Disable();
+//                 //Trace('SequenceState: 20 - Both presses disabled'); // Log presses disabled state
+// 
+//                 // Check not enabled here
+//                 IF (NOT Bottom_Press.Enabled) AND (NOT Top_Press.Enabled) THEN
+//                     SequenceState := SequenceState + 10;
+//                     //Trace('SequenceState: 30 - Both presses not enabled'); // Log state transition when both presses are not enabled
+//                 END_IF
+// 
+//             30:
+//                 StateTasksComplete := TRUE;
+// 
+//             //Trace('StateTasksComplete: TRUE - State tasks completed'); // Log state tasks completion
+//         END_CASE
+// 
+//         SUPER^.Holding();
+// 
+//     E_PMLUnitMode.ePMLUnitMode_Maintenance, E_PMLUnitMode.ePMLUnitMode_Manual:
+//         SUPER^.Holding();
+// END_CASE
+
+Bottom_Press.Stop();
+Top_Press.Stop();
+
+SUPER^.Holding();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{ae1b516a-1481-4b16-8387-b40cb9722364}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(Top_Press);
+        RegisterComponent(Bottom_Press);
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="MotorsInit" Id="{fc4fedfb-25d3-450f-aac4-1faef6c8d14e}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD MotorsInit : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[MotorsInit := FALSE;
+
+IF _InSimulation THEN
+    IF MotorResetAndEnable(Top_Press) AND MotorResetAndEnable(Bottom_Press) THEN
+        MotorsInit := TRUE;
+    END_IF
+ELSE
+    IF MotorResetAndEnable(Top_Press) AND MotorResetAndEnable(Bottom_Press) THEN
+        MotorsInit := TRUE;
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="NailplateCountData_Ready" Id="{c5e3b854-c07c-4145-99e1-20126c5e0ddd}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY NailplateCountData_Ready : bool]]></Declaration>
+      <Get Name="Get" Id="{5c2a2d60-7d2a-4c9a-a8c3-7d789aa7b44b}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[NailplateCountData_Ready := _NailplateCountData_Ready;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="NailplateCountData_Sent" Id="{b3f215b8-3dea-4c2f-be90-70fdcb4cfacc}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY NailplateCountData_Sent : bool]]></Declaration>
+      <Get Name="Get" Id="{88e36ae2-6ea5-41a4-b44c-f3900c20568f}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[NailplateCountData_Sent := _NailplateCountData_Sent;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{3f082745-e692-40b9-bac0-7ea2bdc19a28}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_NailplateCountData_Sent := NailplateCountData_Sent;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="NailplateDataToPass" Id="{202493ba-55b0-403f-af1c-980fd28e410e}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY NailplateDataToPass : ST_PlateInfo]]></Declaration>
+      <Get Name="Get" Id="{1d6a4824-6ec5-4157-bbd6-fa5e935178b8}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[NailplateDataToPass := _NailplateDataToPass;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="PressLogic" Id="{a69a263f-0fc6-4168-ac77-4721a7776e76}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PressLogic : BOOL
+VAR_INPUT
+    PressMotor : REFERENCE TO FB_Component_BasicSlaveAxis_SoE;
+    Recipe     : REFERENCE TO ST_PressRecipe;
+END_VAR
+
+VAR
+    TorqueMoveEnabled : BOOL := FALSE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//reset response
+
+Recipe.State_Response := E_RamState.rsUNDEFINED;
+
+CASE Recipe.State OF
+    E_RamState.rsIDLE, E_RamState.rsINIT:
+
+        PressMotor.Velocity     := Recipe.Axis.Velocity;
+        PressMotor.Acceleration := Recipe.Axis.Acceleration;
+
+        Recipe.State_Response := Recipe.State;
+
+    E_RamState.rsFULL_RETRACT:
+
+        CASE Recipe.SubState OF
+            0:
+                PressMotor.MoveAbsolute(Position := Recipe.OpenPosition, TRUE);
+                Recipe.SubState := Recipe.SubState + 1;
+
+            1:
+                //wait for servo to get into position
+
+                IF Recipe.AtTop AND NOT PressMotor.Busy THEN
+                    //servo in position
+
+                    Recipe.State_Response := Recipe.State;
+                END_IF
+        END_CASE
+
+    E_RamState.rsFULL_EXTEND:
+        ;
+
+    E_RamState.rsEXTEND_TO_BACKER:
+        CASE Recipe.SubState OF
+            0:
+                PressMotor.MoveAbsolute(Position := Recipe.BackerPosition, TRUE);
+                Recipe.SubState := Recipe.SubState + 1;
+
+            1:
+                //wait for servo to get into position
+
+                IF Recipe.AtWork AND NOT PressMotor.Busy THEN
+                    //servo in position
+
+                    Recipe.State_Response := Recipe.State;
+                END_IF
+        END_CASE
+
+    E_RamState.rsEXTEND_TO_CLOSED:
+        CASE Recipe.SubState OF
+            0:
+                PressMotor.MoveAbsolute(Position := Recipe.ClosedPosition, TRUE);
+                Recipe.SubState := Recipe.SubState + 1;
+
+            1:
+                //wait for servo to get into position
+
+                IF PressMotor.InPosition AND NOT PressMotor.Busy THEN
+                    //servo in position
+
+                    Recipe.State_Response := Recipe.State;
+                END_IF
+        END_CASE
+
+        // this state will start movement to a closed prep position after nailplate is placed.  movement will be overrided if next movement is hit before this one finishes
+    E_RamState.rsEXTEND_TO_CLOSED_PREP:
+        CASE Recipe.SubState OF
+            0:
+                PressMotor.MoveAbsolute(Position := Recipe.ClosedPosition - 70, TRUE);
+                Recipe.SubState := Recipe.SubState + 1;
+
+            1:
+                //wait for servo to get into position
+
+                IF PressMotor.Busy THEN
+                    //servo in position
+
+                    Recipe.State_Response := Recipe.State;
+                END_IF
+        END_CASE
+
+    E_RamState.rsEXTEND_TO_PRESSURE:
+        CASE Recipe.SubState OF
+            0:
+                IF RobotClearOfPress THEN
+                    IF TorqueMoveEnabled THEN
+                        Recipe.SubState := 10;
+                    ELSE
+                        Recipe.SubState := 20;
+
+                    END_IF
+                END_IF
+
+            10:
+                Recipe.TorqueOptions.EnableManualTorqueStartValue := TRUE;
+                Recipe.TorqueOptions.ManualTorqueStartValue       := PressMotor.Axis.NcToPlc.ActTorque;
+                Recipe.Execute_TorqueMove                         := FALSE;
+
+                Recipe.TorqueControl.Torque := Recipe.Axis.Torque;
+                Trace('Press Motor Torque Command High');
+
+                IF ABS(PressMotor.Axis.NcToPlc.ActTorque - Recipe.TorqueControl.Torque) < 0.5 AND PressMotor.Axis.NcToPlc.ActVelo < 0.5 THEN
+                    Recipe.SubState           := 50;
+                    Recipe.Execute_TorqueMove := FALSE;
+                END_IF
+
+            20:
+                PressMotor.MoveAbsolute(Position := Recipe.ClosedPosition + 4, TRUE);
+                Recipe.SubState := 21;
+
+            21:
+                //wait for servo to get into position
+
+                IF Recipe.AtWork AND NOT PressMotor.Busy THEN
+                    //servo in position
+
+                    Recipe.SubState := 50;
+                END_IF
+
+            50:
+                IF PressMotor.ActualVelocity < 1 THEN
+                    PressMotor.Stop();
+
+                    IF PressMotor.Stopped THEN
+                        Recipe.State_Response := Recipe.State;
+                    END_IF
+                END_IF
+        END_CASE
+
+    E_RamState.rsRETRACT_FOR_INDEX:
+        CASE Recipe.SubState OF
+            0:
+                PressMotor.MoveAbsolute(Position := Recipe.ClosedPosition - 10, TRUE);
+                Recipe.SubState := Recipe.SubState + 1;
+
+            1:
+                //wait for servo to get into position
+
+                IF PressMotor.ActualPosition < Recipe.ClosedPosition THEN
+                    //servo in position
+
+                    Recipe.SubState := Recipe.SubState + 1;
+                END_IF
+
+            2:
+
+                Recipe.State_Response := Recipe.State;
+
+        END_CASE
+
+    E_RamState.rsERROR:
+        PressMotor.Stop();
+
+END_CASE
+
+Recipe.TorqueControl(Axis              := PressMotor.Axis,
+                     Execute           := Recipe.Execute_TorqueMove,
+                     TorqueRamp        := 50,
+                     VelocityLimitHigh := Recipe.Axis.Velocity,
+                     VelocityLimitLow  := -Recipe.Axis.Velocity,
+                     Options           := Recipe.TorqueOptions);
+
+//if we have changed states, make sure to reset sub step
+
+IF Recipe.State <> Recipe.State_Previous THEN
+    Recipe.SubState := 0;
+    Trace(CONCAT('RamState changed state to: ', TO_STRING(Recipe.State)));
+END_IF
+
+Recipe.State_Previous := Recipe.State;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="PressRobotPermissionToEnter" Id="{11f85e77-7393-4286-b114-2095d852440f}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PressRobotPermissionToEnter : REFERENCE TO ST_MediatorInterface]]></Declaration>
+      <Get Name="Get" Id="{d5d68456-a0c4-414b-a971-5f952e135325}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[PressRobotPermissionToEnter REF= _PressRobotPermissionToEnter;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{b8449c5d-198d-4653-9175-325e6e6bc0eb}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_PressRobotPermissionToEnter := PressRobotPermissionToEnter;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Starting" Id="{1ecdca8e-4b86-4beb-b931-b29c9736054f}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Starting
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE DescendantSequenceState OF
+    0:
+        IF MotorsInit() THEN
+            DescendantSequenceState := 10;
+        END_IF
+
+    10:
+        Bottom_Press.MoveAbsolute(Position := BottomPressRecipe.OpenPosition, TRUE);
+        Top_Press.MoveAbsolute(Position := TopPressRecipe.OpenPosition, TRUE);
+        DescendantSequenceState := 15;
+
+    15:
+        IF TopPressRecipe.AtTop AND NOT Top_Press.Busy AND BottomPressRecipe.AtTop AND NOT Bottom_Press.Busy THEN
+            //servo in position
+            DescendantSequenceState := 20;
+        END_IF
+
+    20:
+        _NailplateCountData_Ready  := FALSE;
+        _NailplateCountData_Sent   := FALSE;
+        _DoublePickData_Sent       := FALSE;
+        _DoublePickData_Ready      := FALSE;
+        BottomPressRecipe.SubState := 0;
+        TopPressRecipe.SubState    := 0;
+        BottomPressRecipe.State    := E_RamState.rsINIT;
+        TopPressRecipe.State       := E_RamState.rsINIT;
+        DetailIndex                := 1;
+
+        Detail_Step := PRESS_INIT;
+        SUPER^.Starting();
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stopping" Id="{4d3b7258-13e4-4193-803d-4088363543e5}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Stopping
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// CASE SequenceState OF
+//     0:
+//         NoStateTasksToComplete := FALSE;
+//         SequenceState          := SequenceState + 10;
+// 
+//         //Trace('SequenceState: 10 - Initial state tasks set, moving to next state'); // Log initial state setup
+//     10:
+//         //         Cooler.Cool := FALSE;
+//         //         Bottom_Press_Hydro.Relax();
+//         //         Top_Press_Hydro.Relax();
+//         Bottom_Press.Stop();
+//         Top_Press.Stop();
+// 
+//         //Trace('SequenceState: 10 - Cooler off, hydraulics relaxed, presses stopping'); // Log cooler, hydraulics, and press stop commands
+//         IF Bottom_Press.Stopped AND Top_Press.Stopped THEN
+//             SequenceState := SequenceState + 10;
+//             //Trace('SequenceState: 20 - Both presses stopped'); // Log state transition when both presses are stopped
+//         END_IF
+// 
+//     20:
+//         // Disable here
+//         Bottom_Press.Disable();
+//         Top_Press.Disable();
+//         //Trace('SequenceState: 20 - Both presses disabled'); // Log presses disabled state
+// 
+//         // Check not enabled here
+//         IF (NOT Bottom_Press.Enabled) AND (NOT Top_Press.Enabled) THEN
+//             SequenceState := SequenceState + 10;
+//             //Trace('SequenceState: 30 - Both presses not enabled'); // Log state transition when both presses are not enabled
+//         END_IF
+// 
+//     30:
+//         StateTasksComplete := TRUE;
+// 
+//     //Trace('StateTasksComplete: TRUE - State tasks completed'); // Log state tasks completion
+// END_CASE
+
+Bottom_Press.Stop();
+Top_Press.Stop();
+
+SUPER^.Stopping();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspending" Id="{40515da3-5dc0-4fd3-b6cd-f3f76ae5cb18}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Suspending
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// CASE SequenceState OF
+//     0:
+//         NoStateTasksToComplete := FALSE;
+//         SequenceState          := SequenceState + 10;
+// 
+//         //Trace('SequenceState: 10 - Initial state tasks set, moving to next state'); // Log initial state setup
+//     10:
+//         //         Bottom_Press_Hydro.Relax();
+//         //         Top_Press_Hydro.Relax();
+//         Bottom_Press.Stop();
+//         Top_Press.Stop();
+// 
+//         //Trace('SequenceState: 10 - Hydraulics relaxed, presses stopping'); // Log hydraulics relaxation and presses stopping
+//         IF Bottom_Press.Stopped AND Top_Press.Stopped THEN
+//             SequenceState := SequenceState + 10;
+//             //Trace('SequenceState: 20 - Both presses stopped'); // Log state transition when both presses are stopped
+//         END_IF
+// 
+//     20:
+//         // Disable here
+//         Bottom_Press.Disable();
+//         Top_Press.Disable();
+//         //Trace('SequenceState: 20 - Both presses disabled'); // Log presses disabled state
+// 
+//         // Check not enabled here
+//         IF (NOT Bottom_Press.Enabled) AND (NOT Top_Press.Enabled) THEN
+//             SequenceState := SequenceState + 10;
+//             //Trace('SequenceState: 30 - Both presses not enabled'); // Log state transition when both presses are not enabled
+//         END_IF
+// 
+//     30:
+//         StateTasksComplete := TRUE;
+// 
+//     //Trace('StateTasksComplete: TRUE - State tasks completed'); // Log state tasks completion
+// END_CASE
+
+Bottom_Press.Stop();
+Top_Press.Stop();
+
+SUPER^.Suspending();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unholding" Id="{57cfcd74-5814-446e-bed4-d8381465dfcb}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Unholding
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// CASE _CurrentMode OF
+//     //=================================PRODUCTION MODE==================================
+//     E_PMLUnitMode.ePMLUnitMode_Production:
+//         CASE SequenceState OF
+//             0:
+//                 NoStateTasksToComplete := FALSE;
+//                 Bottom_Press.Enable();
+//                 Top_Press.Enable();
+// 
+//                 //Trace('SequenceState: 0 - Both presses enabled'); // Log enabling of presses
+//                 // Check enabled here
+//                 IF Bottom_Press.Enabled AND Top_Press.Enabled THEN
+//                     SequenceState := 50; // Skipping movement on unholding
+//                     //Trace('SequenceState: 50 - Skipping movement, both presses enabled'); // Log state transition when both presses are enabled
+//                 END_IF
+// 
+//             10:
+//                 Bottom_Press.Velocity     := BottomPressRecipe.Axis.Velocity;
+//                 Bottom_Press.Acceleration := BottomPressRecipe.Axis.Acceleration;
+//                 Bottom_Press.MoveAbsolute(Position := BottomPressRecipe.OpenPosition, TRUE);
+//                 SequenceState := SequenceState + 10;
+// 
+//                 //Trace('SequenceState: 20 - Main press moving to open position'); // Log state transition and main press movement
+//             20:
+//                 IF Bottom_Press.InPosition AND NOT Bottom_Press.Busy THEN
+//                     SequenceState := SequenceState + 10;
+//                     //Trace('SequenceState: 30 - Main press in position'); // Log state transition when main press is in position
+//                 END_IF
+// 
+//             30:
+//                 Top_Press.Velocity     := TopPressRecipe.Axis.Velocity;
+//                 Top_Press.Acceleration := TopPressRecipe.Axis.Acceleration;
+//                 Top_Press.MoveAbsolute(Position := TopPressRecipe.OpenPosition, TRUE);
+//                 SequenceState := SequenceState + 10;
+// 
+//                 //Trace('SequenceState: 40 - Aux press moving to open position'); // Log state transition and aux press movement
+//             40:
+//                 IF Top_Press.InPosition AND NOT Top_Press.Busy THEN
+//                     SequenceState := SequenceState + 10;
+//                     //Trace('SequenceState: 50 - Aux press in position'); // Log state transition when aux press is in position
+//                 END_IF
+// 
+//             50:
+//                 StateTasksComplete := TRUE;
+//                 //Trace('StateTasksComplete: TRUE - State tasks completed'); // Log state tasks completion
+//                 TopPressRecipe.SubState    := 0;
+//                 BottomPressRecipe.SubState := 0;
+//         END_CASE
+// 
+//         SUPER^.Unholding();
+// 
+//     E_PMLUnitMode.ePMLUnitMode_Maintenance, E_PMLUnitMode.ePMLUnitMode_Manual:
+//         SUPER^.Unholding();
+// END_CASE
+
+TopPressRecipe.SubState    := 0;
+BottomPressRecipe.SubState := 0;
+
+SUPER^.Unholding();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unsuspending" Id="{a7234d7e-811f-414c-a99e-6bc0b79a6b30}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Unsuspending
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// CASE _CurrentMode OF
+//     //=================================PRODUCTION MODE==================================
+//     E_PMLUnitMode.ePMLUnitMode_Production, E_PMLUnitMode.ePMLUnitMode_Manual:
+//         CASE SequenceState OF
+//             0:
+//                 NoStateTasksToComplete := FALSE;
+//                 Bottom_Press.Enable();
+//                 Top_Press.Enable();
+// 
+//                 //Trace('SequenceState: 0 - Both presses enabled'); // Log enabling of presses
+//                 // Check enabled here
+//                 IF Bottom_Press.Enabled AND Top_Press.Enabled THEN
+//                     SequenceState := 50; // Skipping movement on unsuspending
+//                     //Trace('SequenceState: 50 - Skipping movement, both presses enabled'); // Log state transition when both presses are enabled
+//                 END_IF
+// 
+//             10:
+//                 Bottom_Press.Velocity     := BottomPressRecipe.Axis.Velocity;
+//                 Bottom_Press.Acceleration := BottomPressRecipe.Axis.Acceleration;
+//                 Bottom_Press.MoveAbsolute(Position := BottomPressRecipe.OpenPosition, TRUE);
+//                 SequenceState := SequenceState + 10;
+// 
+//                 //Trace('SequenceState: 10 - Main press moving to open position'); // Log state transition and main press movement
+//             20:
+//                 IF Bottom_Press.InPosition AND NOT Bottom_Press.Busy THEN
+//                     SequenceState := SequenceState + 10;
+//                     //Trace('SequenceState: 20 - Main press in position'); // Log state transition when main press is in position
+//                 END_IF
+// 
+//             30:
+//                 Top_Press.Velocity     := TopPressRecipe.Axis.Velocity;
+//                 Top_Press.Acceleration := TopPressRecipe.Axis.Acceleration;
+//                 Top_Press.MoveAbsolute(Position := TopPressRecipe.OpenPosition, TRUE);
+//                 SequenceState := SequenceState + 10;
+// 
+//                 //Trace('SequenceState: 30 - Aux press moving to open position'); // Log state transition and aux press movement
+//             40:
+//                 IF Top_Press.InPosition AND NOT Top_Press.Busy THEN
+//                     SequenceState := SequenceState + 10;
+//                     //Trace('SequenceState: 40 - Aux press in position'); // Log state transition when aux press is in position
+//                 END_IF
+// 
+//             50:
+//                 StateTasksComplete := TRUE;
+// 
+//             //Trace('StateTasksComplete: TRUE - State tasks completed'); // Log state tasks completion
+//         END_CASE
+// 
+//         //=================================MAINTENANCE MODE==================================
+//     E_PMLUnitMode.ePMLUnitMode_Maintenance:
+//         ;
+// END_CASE
+
+TopPressRecipe.SubState    := 0;
+BottomPressRecipe.SubState := 0;
+
+SUPER^.Unsuspending();]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

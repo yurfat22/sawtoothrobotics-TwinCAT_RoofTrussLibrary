@@ -1,0 +1,132 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_MyComponent" Id="{e533e52e-3b87-4a36-a52c-591f832e79a2}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_MyComponent EXTENDS FB_ComponentBase_SR IMPLEMENTS I_MyComponent
+VAR
+    // Inputs
+
+    MyInput AT %I* : BOOL;
+
+    // Outputs
+
+    MyOutput AT %Q* : BOOL;
+
+    // HMI
+
+    MyComponent_HMI : ST_ComponentMyComponent_HMI;
+
+    // Alarms
+
+    MyComponentAlarms : ARRAY[1..MY_COMPONENT_ALARMS_COUNT] OF FB_TcAlarm;
+
+    // Internal variables
+
+    _MyVarProperty1 : BOOL;
+    _MyVarProperty2 : BOOL;
+    MyVarEnternal1  : BOOL;
+    MyVarEnternal2  : BOOL;
+
+END_VAR
+
+VAR CONSTANT
+    MY_COMPONENT_ALARMS_COUNT : UDINT := 5;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{ec53c635-61fe-466a-82b0-1cac7fc5c81e}" />
+    <Folder Name="I_CyclicFB" Id="{c04023d8-796e-489b-99b2-512335f7ba77}" />
+    <Folder Name="I_Template" Id="{babb7ecc-041c-4378-aa84-ac14208211ef}" />
+    <Folder Name="Methods" Id="{0fc2344f-38f6-44be-8201-8686c736bb40}" />
+    <Folder Name="Properties" Id="{f36be92b-5752-4e90-86b0-4dbdad3c30bb}" />
+    <Method Name="CreateEvents" Id="{a1c03378-4ee0-42d7-9084-db91c71db033}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{112bd1e2-b4ca-4fcb-940f-9beb7817cf3f}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+//Custom Component Logic goes here
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := MyComponentAlarms, CurrentSeverity := _CurrentAlarmSeverity);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{077da051-612e-481a-9258-3a7384c61bbc}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{a9eff1ff-64f9-4dee-a49f-b05665aa5e99}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="MyInput" Id="{3f224b1c-5259-4bdc-b7db-753ee4206540}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MyInput : BOOL]]></Declaration>
+      <Get Name="Get" Id="{2b975f0f-4d01-4d90-8c7b-47232f763956}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MyInput := _Present;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{9a2ff8a1-b4ac-43b8-af82-5908b58c19ad}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Present := MyInput;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="MyOutput" Id="{2f08755d-267d-4cfb-b86a-fd4a447d0fb7}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MyOutput : BOOL]]></Declaration>
+      <Get Name="Get" Id="{4c8a3854-94f0-4cbe-adeb-3570c6a6a3a5}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[MyOutput := _MyOutput;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{5a70e89d-3ce3-49c5-aade-7fb6ad790b16}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SystemState := MyOutput;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MediatorInterface" Id="{02ccfe20-b771-4dd1-9dbf-a71b06eda2a1}">
+    <Declaration><![CDATA[TYPE
+    ST_MediatorInterface : STRUCT
+        Request    : BOOL;
+        Permission : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

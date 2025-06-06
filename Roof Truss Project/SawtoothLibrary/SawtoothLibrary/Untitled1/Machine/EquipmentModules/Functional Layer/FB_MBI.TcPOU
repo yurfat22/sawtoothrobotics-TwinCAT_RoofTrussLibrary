@@ -1,0 +1,763 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_MBI" Id="{60834103-8a30-47c4-b307-fe3185f748c9}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_MBI EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    ipSubModules_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_PackML_BaseModule := [];
+
+    // Component definitions here
+
+    InfeedMotor         : FB_Component_ABB_VFD_EIP            := (Name := 'InfeedMotor');
+    IndexSensor         : FB_DigitalSensor            := (Name := 'IndexSensor');
+    BoardPresentSensor1 : FB_DigitalSensor            := (Name := 'BoardPresentSensor1');
+    BoardPresentSensor2 : FB_DigitalSensor            := (Name := 'BoardPresentSensor2');
+    ControlPendant      : FB_ControlPendant           := (Name := 'ControlPendent');
+    LightStack          : FB_Component_StackLight_MBI := (Name := 'LightStack');
+
+    testErrorFlag       : BOOL;
+    testErrorID         : UDINT;
+    MBIInfeedHSTimeout  : BOOL;
+    _MainSafetyOK       : BOOL;
+    _CurrentParentState : E_PMLState;
+    BoardDropRequested  : BOOL;
+END_VAR
+
+VAR
+    _ActiveConvState : E_MBI_States;
+
+    _BoardDropped     : BOOL := FALSE; // Flag indicating if a board was dropped   
+    _DropBoard        : BOOL := FALSE; // Command to drop a board
+    _bMonitorRearEdge : BOOL := FALSE; // Flag to monitor carriage rear edge
+
+    // State machine variables
+
+    _Active            : BOOL := FALSE;
+    _ReadyForBoard     : BOOL; // The current input signal for ready for board.
+    _ReadyForBoardPrev : BOOL := FALSE; // Holds the previous state of ReadyForBoard.
+    _RisingEdgeReady   : BOOL := FALSE; // Indicates a rising edge detection.
+    _bFoundBoardToDrop : BOOL; // The current input signal for ready for board.
+    _bBoardInNextLane  : BOOL;
+    _SubStep           : INT;
+    _ResetActive       : BOOL;
+
+    _TestExecute : BOOL;
+
+    ReadyForBoard_RTRIG : R_TRIG;
+    MBIAlarms           : ARRAY[1..MBI_ALARMS_COUNT] OF FB_TcAlarm;
+
+    _LineNumber : INT;
+
+END_VAR
+
+VAR CONSTANT
+    MBI_ALARMS_COUNT : USINT := 10;
+END_VAR
+
+VAR CONSTANT
+
+    // Reports 
+
+    FAULT : INT := 1;
+
+    // Alarms
+
+    PULL_WHEELS_ALARM_COUNT : INT := 5;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{5be4a460-ea57-49a6-a85c-6ef4762566c5}" />
+    <Folder Name="Methods" Id="{468a4f2e-4805-4eb5-bc94-87e6397c4178}">
+      <Folder Name="Acting States" Id="{c136f5c1-6c32-4583-ab50-7e61d17655b6}" />
+      <Folder Name="Waiting States" Id="{5e9c226c-10ba-4d2f-a9b6-648a4af5e818}" />
+    </Folder>
+    <Folder Name="Properties" Id="{2210ec3f-7bd3-4b7d-9c55-7dd35560d0a8}" />
+    <Method Name="Aborted" Id="{bd601173-1749-4525-a2cf-5f6e15e82797}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Aborted</b> state*)
+METHOD PROTECTED Aborted]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _MainSafetyOK THEN
+    ChangeState(E_PMLCommand.ePMLCommand_Clear);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Aborting" Id="{13a41b0c-080d-4831-8c06-1b419d628764}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Holding</b> state*)
+METHOD PROTECTED Aborting]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[InfeedMotor.Stop();
+
+SUPER^.Aborting();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Auto" Id="{545d7c3d-28fa-4a6d-ab3d-763be24a98b4}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Auto : BOOL
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    Previous_State : E_MBI_States;
+    BoardDropTON   : TON;
+END_VAR
+
+VAR
+    result : USINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// State Machine Logic
+
+IF _ResetActive THEN
+    _ActiveConvState := acIDLE;
+ELSE
+    CASE _ActiveConvState OF
+
+        acIDLE:
+
+            // Reset state machine variables
+
+            _SubStep := 0;
+
+            IF BoardPresentSensor2.Active THEN
+                _bBoardInNextLane := FALSE;
+                _ActiveConvState  := acWAIT_INFEED_READY;
+            ELSE
+                _ActiveConvState := acINDEX_FORWARD;
+            END_IF
+
+            BoardDropTON(IN := FALSE, PT := T#30S);
+
+        acINDEX_FORWARD:
+
+            // Index the conveyor forward until the first board sensor is made
+
+            InfeedMotor.Jog(JogFW := TRUE);
+            InfeedMotor.ReferenceVel := 2000;
+
+            IF BoardPresentSensor2.Active THEN
+                _ActiveConvState := acWAIT_INFEED_READY;
+            END_IF
+
+        acWAIT_INFEED_READY:
+            // Board is in position, wait for infeed to be ready
+
+            BoardDropTON(IN := TRUE, PT := T#30S);
+            InfeedMotor.Stop();
+
+            IF BoardDropRequested = FALSE THEN
+                IF THIS^.Name = 'MBI_1' THEN
+                    IF WaitSync_Handler(E_WaitSync.INFEED1_MBI_DROP_BOARD) THEN
+                        BoardDropRequested := TRUE;
+                    END_IF
+                ELSIF THIS^.Name = 'MBI_2' THEN
+                    IF WaitSync_Handler(E_WaitSync.INFEED2_MBI_DROP_BOARD) THEN
+                        BoardDropRequested := TRUE;
+                    END_IF
+                END_IF
+            END_IF
+
+            IF BoardDropRequested THEN
+                _ActiveConvState := acDUMP_BOARD;
+                BoardDropTON(IN := FALSE, PT := T#30S);
+            ELSE
+                MBIInfeedHSTimeout := BoardDropTON.Q;
+            END_IF
+
+        acDUMP_BOARD:
+
+            BoardDropRequested := FALSE;
+            // Move forward to dump board
+
+            InfeedMotor.Jog(JogFW := TRUE);
+
+            CASE _SubStep OF
+                0:
+                    IF BoardPresentSensor2.Active THEN
+                        _SubStep := 1;
+                    END_IF
+
+                1:
+                    IF NOT BoardPresentSensor2.Active THEN
+                        _ActiveConvState  := acIDLE;
+                        _SubStep          := 0;
+                        _BoardDropped     := TRUE;
+                        _bMonitorRearEdge := FALSE;
+                    END_IF
+
+            END_CASE
+
+        acBOARD_LOST:
+
+        // TODO: Add error handling for board lost scenario
+    END_CASE
+
+END_IF
+
+IF _ActiveConvState <> Previous_State THEN
+    Trace(CONCAT('MBI state change to: ', TO_STRING(_ActiveConvState)));
+END_IF
+
+Previous_State := _ActiveConvState;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="BoardDropped" Id="{ea28691e-5cb0-424a-996f-d2a6d038ef79}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY BoardDropped : bool]]></Declaration>
+      <Get Name="Get" Id="{9ea592fa-e9c1-428d-81aa-298edb7aa3ee}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[BoardDropped := _BoardDropped;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="CreateEvents" Id="{c68a84ee-f8a4-4bef-9f14-f7aedeef6f7b}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_CreateAllEventsInClass(Alarms     := MBIAlarms,
+                         ClassSize  := SIZEOF(TC_EVENTS.MBI),
+                         pInitEvent := ADR(TC_EVENTS.MBI.InitReferenceEvent),
+                         Prefix     := _Name);
+
+SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{a019e294-f4d7-4874-a46e-4d821233a8e6}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+SUPER^.CyclicLogic();
+
+//HMI control for EM
+IF THIS^.Name = 'MBI_1' AND _LineNumber = 1 THEN
+	LightStack.AmberLight.TurnOn();
+	
+ELSIF THIS^.Name = 'MBI_2' AND _LineNumber = 2 THEN
+	LightStack.AmberLight.TurnOn();
+
+ELSE
+	LightStack.AmberLight.TurnOff();
+END_IF
+fbControlSourceHMI.CyclicLogic();
+
+//Set the current alarm severity for this module
+
+// _CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms:=PullWheelAlarms, CurrentSeverity:=_CurrentAlarmSeverity);
+
+//Simulate Alarm Messaging
+
+CyclicLogicSimulation();
+
+// Production();
+
+Monitoring();
+
+// ControlPendant.GreenButton.LED.Flash();
+
+// ControlPendant.YellowButton.LED.Flash(T#300MS,T#500MS);
+
+// ControlPendant.BlueButton.LED.Flash(T#700MS,T#500MS);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Execute" Id="{4ff1c89d-f640-48ad-aced-e1cbdaa0b579}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Execute
+VAR_INPUT
+END_VAR
+
+VAR
+    WhiteLight : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Function based on mode.  NO need to make SUPER^.Executing() since it does nothing.
+IF _MainSafetyOK THEN
+    IF ControlPendant.YellowButton.Button_Pressed THEN
+        ChangeState(E_PMLCommand.ePMLCommand_Hold);
+    END_IF
+
+    IF ControlPendant.Mode_Auto THEN
+        // Auto Mode Operations
+        IF _CurrentParentState = E_PMLState.ePMLState_Execute THEN
+            Auto();
+            LightStack.WhiteLight.TurnOn();
+        ELSE
+            LightStack.WhiteLight.Flash();
+            InfeedMotor.Stop();
+        END_IF
+    ELSIF ControlPendant.Mode_Manual_1 THEN
+        // Manual Mode Forward Operations
+        IF _MainSafetyOK THEN
+            LightStack.WhiteLight.Flash();
+            ManualMode_Forward();
+        END_IF
+    ELSIF ControlPendant.Mode_Manual_2 THEN
+        // Manual Mode Reverse Operations
+
+        IF _MainSafetyOK THEN
+            LightStack.WhiteLight.Flash();
+            ManualMode_Reverse();
+        END_IF
+    ELSE
+        // Error Handling for No Mode Chosen
+
+        InfeedMotor.Stop();
+    END_IF
+ELSE
+    ChangeState(E_PMLCommand.ePMLCommand_Suspend);
+END_IF
+
+IF ControlPendant.Mode_Manual_1 OR ControlPendant.Mode_Manual_2 THEN
+    ControlPendant.GreenButton.LED.TurnOff();
+    ControlPendant.BlueButton.LED.TurnOn();
+    ControlPendant.YellowButton.LED.TurnOn();
+    _ActiveConvState := 0;
+ELSIF ControlPendant.Mode_Auto THEN
+    ControlPendant.GreenButton.LED.TurnOff();
+    ControlPendant.BlueButton.LED.TurnOff();
+    ControlPendant.YellowButton.LED.TurnOn();
+ELSE
+    ControlPendant.GreenButton.LED.TurnOn();
+    ControlPendant.BlueButton.LED.TurnOn();
+    ControlPendant.YellowButton.LED.TurnOn();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Held" Id="{bc826a5a-be7a-4b4d-8fd9-ab80d374b011}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Held
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_ActiveConvState := acIDLE;
+
+IF _MainSafetyOK THEN
+    IF ControlPendant.GreenButton.Button_Pressed THEN
+        ChangeState(E_PMLCommand.ePMLCommand_Unhold);
+    END_IF
+
+    ControlPendant.GreenButton.LED.TurnOn();
+    ControlPendant.BlueButton.LED.TurnOff();
+    ControlPendant.YellowButton.LED.TurnOff();
+ELSE
+    ControlPendant.GreenButton.LED.Flash();
+    ControlPendant.BlueButton.LED.Flash();
+    ControlPendant.YellowButton.LED.Flash();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{f7eb6aca-e5c1-42c9-a381-b18044d274fb}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Holding" Id="{74aa0402-4923-446a-912a-f26344e6237f}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Holding</b> state*)
+METHOD PROTECTED Holding]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[InfeedMotor.Stop();
+
+SUPER^.Holding();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Idle" Id="{40d87c57-73b5-4a0d-b7e7-c5dd25257166}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Idle
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_ActiveConvState := acIDLE;
+
+IF _MainSafetyOK THEN
+    IF ControlPendant.GreenButton.Button_Pressed THEN
+        ChangeState(E_PMLCommand.ePMLCommand_Start);
+    END_IF
+
+    ControlPendant.GreenButton.LED.TurnOn();
+    ControlPendant.BlueButton.LED.TurnOff();
+    ControlPendant.YellowButton.LED.TurnOff();
+ELSE
+    ControlPendant.GreenButton.LED.Flash();
+    ControlPendant.BlueButton.LED.Flash();
+    ControlPendant.YellowButton.LED.Flash();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{1946a281-851b-4ea6-bbbb-1ebd05de2b1f}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(InfeedMotor);
+        RegisterComponent(BoardPresentSensor1);
+        RegisterComponent(BoardPresentSensor2);
+        RegisterComponent(IndexSensor);
+        RegisterComponent(ControlPendant);
+        RegisterComponent(LightStack);
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="LineNumber" Id="{611836b5-309e-4a86-bcfa-eb36c8ee3b02}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY LineNumber : INT]]></Declaration>
+      <Set Name="Set" Id="{72097050-2920-46e6-9190-a418b1e75f29}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_LineNumber := LineNumber;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="MainSafetyOK" Id="{e63c401e-e458-4e0e-95a9-069bbc4bb896}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY MainSafetyOK : bool]]></Declaration>
+      <Set Name="Set" Id="{88640703-a714-4db6-b6a0-14dac094c5f7}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_MainSafetyOK := MainSafetyOK;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="ManualMode_Forward" Id="{3c83e118-a1b1-4649-ab6a-1563c65286fb}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ManualMode_Forward : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// State Machine Logic
+
+InfeedMotor.ReferenceVel := 2000;
+
+IF _ResetActive THEN
+    _ActiveConvState := acIDLE;
+
+ELSE
+    IF ControlPendant.BlueButton.Button_Pressed AND NOT BoardPresentSensor2.Active THEN
+        InfeedMotor.Jog(JogFW := TRUE);
+    ELSE
+        InfeedMotor.Stop();
+    END_IF
+
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ManualMode_Reverse" Id="{77415089-e3f6-4056-8dc3-0802bad0af7e}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ManualMode_Reverse : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// State Machine Logic
+
+InfeedMotor.ReferenceVel := -2000;
+
+IF _ResetActive THEN
+    _ActiveConvState := acIDLE;
+
+ELSE
+    IF ControlPendant.BlueButton.Button_Pressed THEN
+        InfeedMotor.Jog(JogFW := TRUE);
+    ELSE
+        InfeedMotor.Stop();
+    END_IF
+
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{185a6bd6-0757-4344-9e57-28bf6b467486}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[///////////////////////////////////////////////////////////////////////////////
+// 5. Timeout: ID=5
+///////////////////////////////////////////////////////////////////////////////
+IF (NOT MBIAlarms[E_MBI.BoardNotDropping].bRaised) AND MBIInfeedHSTimeout THEN
+    // Raise alarm if Infeed is taking a long time to get a board
+    MBIAlarms[E_MBI.BoardNotDropping].Raise(0);
+ELSIF MBIAlarms[E_MBI.BoardNotDropping].bRaised AND (NOT MBIInfeedHSTimeout) THEN
+    // Clear when a board is found
+    MBIAlarms[E_MBI.BoardNotDropping].Clear(0, 0);
+END_IF;
+
+//////////////////////////////////////////////////////////////////////////
+// Wrap-up: Evaluate overall severity, then run the extended Monitoring
+//////////////////////////////////////////////////////////////////////////
+_CurrentAlarmSeverity := TcEventSeverity.Verbose;
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := MBIAlarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+// Finally, run the extended monitoring
+// SUPER^.Monitoring();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ParentState" Id="{96905e10-5151-46f9-806c-c6ba9bc67014}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ParentState : E_PMLState]]></Declaration>
+      <Set Name="Set" Id="{761b7d13-5e17-4ff7-b391-6c7ba4264927}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_CurrentParentState := ParentState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Production" Id="{48fa46db-22c4-4102-ae26-b95a3dc0c798}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Production : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ReadyForBoard_RTRIG(CLK := _ReadyForBoard);
+
+IF ReadyForBoard_RTRIG.Q THEN
+    _BoardDropped := FALSE;
+END_IF
+
+IF _ResetActive THEN
+    InfeedMotor.Stop();
+    _ActiveConvState := acIDLE;
+
+    IF ControlPendant.GreenButton.Button_Pressed THEN
+        _ResetActive := FALSE;
+    END_IF
+ELSE
+    IF ControlPendant.Mode_Auto THEN
+        // Auto Mode Operations
+        IF _CurrentState = E_PMLState.ePMLState_Execute AND _MainSafetyOK THEN
+            Auto();
+        ELSE
+            InfeedMotor.Stop();
+        END_IF
+    ELSIF ControlPendant.Mode_Manual_1 THEN
+        // Manual Mode Forward Operations
+        IF _MainSafetyOK THEN
+            LightStack.WhiteLight.Flash();
+            ManualMode_Forward();
+        END_IF
+    ELSIF ControlPendant.Mode_Manual_2 THEN
+        // Manual Mode Reverse Operations
+
+        IF _MainSafetyOK THEN
+            LightStack.WhiteLight.Flash();
+            ManualMode_Reverse();
+        END_IF
+    ELSE
+        // Error Handling for No Mode Chosen
+
+        InfeedMotor.Stop();
+    END_IF
+
+END_IF
+
+// Light Stack Indicators
+
+IF NOT ControlPendant.KeySwitch_Auto.Active OR (_ActiveConvState <> acWAIT_READY AND _ActiveConvState <> acDUMP_BOARD) THEN
+    LightStack.WhiteLight.Flash();
+    LightStack.AmberLight.TurnOff();
+ELSE
+    LightStack.WhiteLight.TurnOff();
+    LightStack.AmberLight.TurnOn();
+END_IF
+
+IF _ResetActive THEN
+    ControlPendant.GreenButton.LED.TurnOn();
+    ControlPendant.BlueButton.LED.TurnOff();
+    ControlPendant.YellowButton.LED.TurnOff();
+
+ELSIF ControlPendant.Mode_Manual_1 OR ControlPendant.Mode_Manual_2 THEN
+    ControlPendant.GreenButton.LED.TurnOff();
+    ControlPendant.BlueButton.LED.TurnOn();
+    ControlPendant.YellowButton.LED.TurnOn();
+    _ActiveConvState := 0;
+ELSIF ControlPendant.Mode_Auto THEN
+    ControlPendant.GreenButton.LED.TurnOff();
+    ControlPendant.BlueButton.LED.TurnOff();
+    ControlPendant.YellowButton.LED.TurnOn();
+ELSE
+    ControlPendant.GreenButton.LED.Flash();
+    ControlPendant.BlueButton.LED.Flash();
+    ControlPendant.YellowButton.LED.Flash();
+
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="ReadyForBoard" Id="{a0d611c3-ae5e-40c7-9de5-9cbbdc6c8a53}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ReadyForBoard : BOOL]]></Declaration>
+      <Set Name="Set" Id="{a97a6d3a-d6b9-4d94-b238-f59796493e6a}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_ReadyForBoard := ReadyForBoard;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Starting" Id="{42cb7a80-4e49-4d80-96f5-3328fca3bc59}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Starting</b> state*)
+METHOD PROTECTED Starting]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_ActiveConvState := 0;
+_BoardDropped    := FALSE;
+
+SUPER^.Starting();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stopped" Id="{b6075a72-11a2-480e-8856-f9cb87358d5a}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Stopped
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _MainSafetyOK THEN
+    ChangeState(E_PMLCommand.ePMLCommand_Reset);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stopping" Id="{826a7bcf-a255-49f0-bb64-3793987ca5fa}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Stopping</b> state*)
+METHOD PROTECTED Stopping]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[InfeedMotor.Stop();
+
+SUPER^.Stopping();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspended" Id="{c3f251d6-6afa-4fc1-9237-40cc7b7963af}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[METHOD PROTECTED Suspended
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_ActiveConvState := acIDLE;
+
+IF _MainSafetyOK THEN
+    IF ControlPendant.GreenButton.Button_Pressed THEN
+        ChangeState(E_PMLCommand.ePMLCommand_Unsuspend);
+    END_IF
+
+    ControlPendant.GreenButton.LED.TurnOn();
+    ControlPendant.BlueButton.LED.TurnOff();
+    ControlPendant.YellowButton.LED.TurnOff();
+ELSE
+    ControlPendant.GreenButton.LED.Flash();
+    ControlPendant.BlueButton.LED.Flash();
+    ControlPendant.YellowButton.LED.Flash();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Suspending" Id="{2f131a61-8cc8-4ef9-a777-60ae154ca90b}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Holding</b> state*)
+METHOD PROTECTED Suspending]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[InfeedMotor.Stop();
+
+SUPER^.Suspending();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="TestExecute" Id="{81010e71-67c3-4b81-8676-85034b6379f9}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY TestExecute : bool]]></Declaration>
+      <Set Name="Set" Id="{841ee8bb-e3c9-41f7-a416-4492e79bff3f}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_TestExecute := TestExecute;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Unholding" Id="{6b2c311f-7c3c-4bae-8789-246d47a12253}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Unholding</b> state*)
+METHOD PROTECTED Unholding]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _MainSafetyOK THEN
+    SUPER^.Unholding();
+ELSE
+    StateComplete();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Unsuspending" Id="{a18d2c3d-52d9-4775-b287-35f5568d77ad}" FolderPath="Methods\Acting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Unsuspending</b> state*)
+METHOD PROTECTED Unsuspending]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF _MainSafetyOK THEN
+    SUPER^.Unsuspending();
+ELSE
+    StateComplete();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

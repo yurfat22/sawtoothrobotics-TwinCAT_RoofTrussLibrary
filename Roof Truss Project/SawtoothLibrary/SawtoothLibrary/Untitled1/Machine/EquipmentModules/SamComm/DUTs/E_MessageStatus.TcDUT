@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_MessageStatus" Id="{bab5d667-db2d-42f3-aa48-93e9e7c1122a}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_MessageStatus : (
+        MS_INIT,
+        MS_BUSY,
+        MS_RECEIVED,
+        MS_SENT,
+        MS_TIMED_OUT,
+        MS_GOT_ACK,
+        MS_GOT_NAK,
+        MS_NO_DATA,
+        MS_ERROR
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

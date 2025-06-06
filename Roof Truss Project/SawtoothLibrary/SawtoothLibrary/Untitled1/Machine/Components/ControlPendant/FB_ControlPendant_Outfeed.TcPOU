@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_ControlPendant_Outfeed" Id="{d26d5c5e-d970-4d54-97c1-f646ab2d7a59}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ControlPendant_Outfeed EXTENDS FB_ComponentBase_SR
+VAR
+    Light           : FB_Component_Indicator := (Name := 'Pendant Light');
+    SafetyReset     : FB_Component_Button    := (Name := 'Oufeed Safety Reset');
+    ClearConveyor   : FB_Component_Button    := (Name := 'Clear Conveyor');
+    RetractSlideout : FB_Component_Button    := (Name := 'Retract Slideout');
+    ExtendSlideout  : FB_Component_Button    := (Name := 'Extend Slideout');
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{ccd0aca7-9411-4e00-b029-5a2065596ce7}" />
+    <Folder Name="Methods" Id="{29b1361b-59ae-4cd9-b1a0-08e5c1439fb1}" />
+    <Folder Name="Properties" Id="{64ca89d7-be7e-4383-8c60-d6e03e00db92}" />
+    <Method Name="CreateEvents" Id="{3894af70-6240-4e3b-9ff2-bba9894995d7}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{ce02fd76-af83-417b-b856-923c40703579}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+//Custom Component Logic goes here
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := Comp_Alarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+Light.CyclicLogic();
+SafetyReset.CyclicLogic();
+ClearConveyor.CyclicLogic();
+RetractSlideout.CyclicLogic();
+ExtendSlideout.CyclicLogic();
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{ae9ec7bb-dd64-495f-afe1-b70661ebfa59}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{2a6754ae-7fec-41bc-92ba-9074975c7b01}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

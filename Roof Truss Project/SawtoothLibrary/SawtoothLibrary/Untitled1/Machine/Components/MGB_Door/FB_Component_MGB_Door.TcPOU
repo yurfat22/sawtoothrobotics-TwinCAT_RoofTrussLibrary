@@ -1,0 +1,227 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_MGB_Door" Id="{1b44e3b8-7509-4248-895c-9a8c9ca1f8b2}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_MGB_Door EXTENDS FB_ComponentBase_SR
+VAR_INPUT
+    // Inputs
+
+    EstopOK_CH1    : FB_DigitalSensor;
+    EstopOK_CH2    : FB_DigitalSensor;
+    AutoStopOK_CH1 : FB_DigitalSensor;
+    AutoStopOK_CH2 : FB_DigitalSensor;
+    Closed         : FB_DigitalSensor;
+    mgbError       : FB_DigitalSensor;
+    Pause          : FB_DigitalSensor;
+    Resume         : FB_DigitalSensor;
+
+    // Outputs
+    Lock_Door  : FB_Component_Indicator;
+    Reset_Door : FB_Component_Indicator;
+    Estop_LED  : FB_Component_Indicator;
+    Pause_LED  : FB_Component_Indicator;
+    Resume_LED : FB_Component_Indicator;
+END_VAR
+
+VAR
+
+    // Alarms
+    StackLightAlarms : ARRAY[1..STACKLIGHT_ALARMS_COUNT] OF FB_TcAlarm;
+
+    IsGreenFlashing : BOOL;
+    IsRedFlashing   : BOOL;
+    IsAmberFlashing : BOOL;
+    HMI_DoorStatus  : ST_MGBDoor_HMIStatus;
+    _SafetyReset    : BOOL;
+    Sim_CloseDoor   : BOOL;
+    Sim_ResetEstop  : BOOL;
+
+    Sim_Reset_R_TRIG : R_TRIG;
+
+END_VAR
+
+VAR
+    // Internal state variables
+    DoorLocked   : BOOL := FALSE;
+    PauseActive  : BOOL := FALSE;
+    ResumeActive : BOOL := FALSE;
+    EstopActive  : BOOL := FALSE;
+END_VAR
+
+VAR CONSTANT
+    STACKLIGHT_ALARMS_COUNT : UDINT := 5;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{8e182a66-b8e5-4c3c-b4d9-65f87b7bd4ad}" />
+    <Folder Name="I_CyclicFB" Id="{75f173b7-498e-43aa-b2b7-4466781e21e0}" />
+    <Folder Name="Methods" Id="{a29bb5d7-c572-4af8-8dd0-596bde8b5284}" />
+    <Folder Name="Properties" Id="{31ce6f52-16b0-42f7-9b6e-f9bf5cf8fa52}" />
+    <Property Name="AutoStop_CH_OK" Id="{43d4d719-36d4-40f3-a020-1203fd2492d7}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY AutoStop_CH_OK : BOOL]]></Declaration>
+      <Get Name="Get" Id="{92b9f975-d88e-46f1-af54-ac9c5d959a26}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[AutoStop_CH_OK := AutoStopOK_CH1.Active AND AutoStopOK_CH2.Active;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="CyclicLogic" Id="{6cf77f5d-50fc-408f-96bf-3320408da32a}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+EstopOK_CH1.CyclicLogic();
+EstopOK_CH2.CyclicLogic();
+AutoStopOK_CH1.CyclicLogic();
+AutoStopOK_CH2.CyclicLogic();
+Closed.CyclicLogic();
+mgbError.CyclicLogic();
+Pause.CyclicLogic();
+Resume.CyclicLogic();
+
+Lock_Door.CyclicLogic();
+Pause_LED.CyclicLogic();
+Resume_LED.CyclicLogic();
+Estop_LED.CyclicLogic();
+
+HMI_Status();
+
+EstopOK_CH1.InSimulation    := _Simulate;
+EstopOK_CH2.InSimulation    := _Simulate;
+AutoStopOK_CH1.InSimulation := _Simulate;
+AutoStopOK_CH2.InSimulation := _Simulate;
+
+Sim_Reset_R_TRIG(CLK := _Simulate);
+
+IF Sim_Reset_R_TRIG.Q THEN
+    Sim_CloseDoor  := TRUE;
+    Sim_ResetEstop := TRUE;
+END_IF
+
+IF Sim_CloseDoor THEN
+    AutoStopOK_CH1.SimulationInput := TRUE;
+    AutoStopOK_CH2.SimulationInput := TRUE;
+ELSE
+    AutoStopOK_CH1.SimulationInput := FALSE;
+    AutoStopOK_CH2.SimulationInput := FALSE;
+END_IF
+
+IF Sim_ResetEstop THEN
+    EstopOK_CH1.SimulationInput := TRUE;
+    EstopOK_CH2.SimulationInput := TRUE;
+ELSE
+    EstopOK_CH1.SimulationInput := FALSE;
+    EstopOK_CH2.SimulationInput := FALSE;
+END_IF
+
+// Call Super
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+////_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := StackLightAlarms, CurrentSeverity := _CurrentSeverity, Severity := _CurrentAlarmSeverity);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Estop_CH_OK" Id="{018d7ba5-ceef-4fce-adda-9e33e199fe4b}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Estop_CH_OK : BOOL]]></Declaration>
+      <Get Name="Get" Id="{87aa33c4-ff3c-4599-80dd-91ba174cbdc8}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Estop_CH_OK := EstopOK_CH2.Active AND EstopOK_CH1.Active;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="HMI_Status" Id="{5ea219a3-aee8-46de-99d0-124ce97b62c8}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMI_Status
+VAR_INPUT
+END_VAR
+
+VAR_INST
+    EStop_R_TRIG    : R_TRIG;
+    AutoStop_R_TRIG : R_TRIG;
+    EstopPressed    : BOOL;
+    DoorOpened      : BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[EStop_R_TRIG(CLK := NOT (EstopOK_CH1.Active AND EstopOK_CH2.Active));
+
+IF EStop_R_TRIG.Q THEN
+    EstopPressed := TRUE;
+END_IF
+
+IF _SafetyReset THEN
+	EstopPressed := FALSE;
+END_IF
+
+HMI_DoorStatus.DoorName := Name;
+
+IF EstopPressed THEN
+    IF EstopOK_CH1.Active AND EstopOK_CH2.Active THEN
+        HMI_DoorStatus.EStopStatus_Usint := 4;
+        HMI_DoorStatus.EStopStatus_Str   := 'Reset Needed';
+    ELSE
+        HMI_DoorStatus.EStopStatus_Usint := 2;
+        HMI_DoorStatus.EStopStatus_Str   := 'Estop Pressed';
+    END_IF
+ELSE
+    IF EstopOK_CH1.Active AND EstopOK_CH2.Active THEN
+        HMI_DoorStatus.EStopStatus_Usint := 1;
+        HMI_DoorStatus.EStopStatus_Str   := 'Estop OK';
+    ELSE
+        HMI_DoorStatus.EStopStatus_Usint := 2;
+        HMI_DoorStatus.EStopStatus_Str   := 'Estop Pressed';
+    END_IF
+END_IF
+
+IF AutoStopOK_CH1.Active AND AutoStopOK_CH2.Active THEN
+    HMI_DoorStatus.AutoStopStatus_Usint := 1;
+    HMI_DoorStatus.AutoStopStatus_Str   := 'Door Closed';
+ELSE
+    HMI_DoorStatus.AutoStopStatus_Usint := 2;
+    HMI_DoorStatus.AutoStopStatus_Str   := 'Door Open';
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{d8e12bdb-5dfb-4722-9ee2-22935ec940ff}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="SafetyReset" Id="{fe4263d7-b991-45ac-b6d1-cf6270c8f43c}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY SafetyReset : BOOL]]></Declaration>
+      <Set Name="Set" Id="{4fd050c9-f585-47c2-8944-ac1b3399aa47}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SafetyReset := SafetyReset;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

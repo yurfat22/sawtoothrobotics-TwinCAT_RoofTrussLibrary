@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_AssemblyStart" Id="{dd09fe7f-efab-4c51-abb6-a8b7b56730dc}">
+    <Declaration><![CDATA[TYPE
+    ST_AssemblyStart : STRUCT
+        ComponentID : T_MaxString;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

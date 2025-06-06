@@ -1,0 +1,866 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <FileVersion>1.0.0.0</FileVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <SubObjectsSortedByName>true</SubObjectsSortedByName>
+    <DownloadApplicationInfo>true</DownloadApplicationInfo>
+    <WriteProductVersion>false</WriteProductVersion>
+    <GenerateTpy>false</GenerateTpy>
+    <ProgramVersion>3.1.4026.15</ProgramVersion>
+    <CompilerDefines>VISU_USEPROPERTYINFO</CompilerDefines>
+    <ProjectGuid>{440cec76-37eb-47cc-b8f5-5db2542ff7cf}</ProjectGuid>
+    <Name>Untitled1</Name>
+    <Application>{6268f822-5b0e-4e58-aad3-ac4d81d2e1b3}</Application>
+    <TypeSystem>{7cff15ab-1f6a-4f78-84d5-e07ad54f78df}</TypeSystem>
+    <Implicit_Task_Info>{9c217d96-ccae-4b3b-a822-c3779ae8f27c}</Implicit_Task_Info>
+    <Implicit_KindOfTask>{4bcec7e4-920b-42a7-a1f9-d169bc05c363}</Implicit_KindOfTask>
+    <Implicit_Jitter_Distribution>{97511a1c-593f-4c0e-b9d9-c9e9e04622c5}</Implicit_Jitter_Distribution>
+    <LibraryReferences>{4fed24a8-531d-4dd8-9535-74fd54db7201}</LibraryReferences>
+    <Company>Sawtooth Robotics</Company>
+    <Released>false</Released>
+    <AllowChecksForLibrary>false</AllowChecksForLibrary>
+    <POUsForPropertyAccessIncluded>true</POUsForPropertyAccessIncluded>
+    <GlobalVersionStructureIncluded>true</GlobalVersionStructureIncluded>
+    <Title>RoofTrussLibrary</Title>
+    <ProjectVersion>0.1.0.0</ProjectVersion>
+    <DefaultNamespace>RTL</DefaultNamespace>
+    <Author>Sawtooth Engineers</Author>
+    <Description>Containes components and equipment modules for base components of a roof truss core system.  </Description>
+    <LibraryCategories>
+      <LibraryCategory xmlns="">
+        <Id>{4c30be10-0c29-4796-921e-62ecfda40191}</Id>
+        <Version>1.0.0.0</Version>
+        <DefaultName>Sawtooth Robotics</DefaultName>
+      </LibraryCategory>
+    </LibraryCategories>
+    <SelectedLibraryCategories>
+      <Id xmlns="">{4c30be10-0c29-4796-921e-62ecfda40191}</Id>
+    </SelectedLibraryCategories>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="DUTs\DB_Logging\ST_EquipmentModuleLog.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_AssemblyPickState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_GrabState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_Infeed_States.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_Double_Pick_States.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_MBI_States.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_Outfeed_Conveyor_SubState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_Press_States.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_ReleaseState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_MoveCarriageState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_CarriageStates.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_Location_IDs.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_BoardData_Positions.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\E_Outfeed_Conveyor_State.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\MessageBoxes\ST_MessageBox_Data.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\MessageBoxes\ST_Active_MessageBoxes.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\MessageBoxes\ST_MessageBox_Button.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\MessageBoxes\ST_MessageBox_Buttons.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\MessageBoxes\ST_MessageBox_Response.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\MessageBoxes\ST_MessageBox_Messages.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Motion\E_SpeedOptions.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Motion\ST_HomingParams.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Motion\ST_MoveStates.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\E_CommandName.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\E_RamState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_AssemblyEnd.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_AxisRecipe.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_Board.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_BoardData.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_IndexConveyor.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_CSV.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_CSV_Line.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_CSV_Step.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_AssemblyStart.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_Detail_Descriptions.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_CSV_Generic.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_CSV_Detail.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_AssemblyData.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_BoardInfo.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_PickPlaceDetail.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_PickPlace.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_PlateInfo.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_Plates.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_PositionInfo.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_PressRecipe.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_TrussInfo.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\Recipe\ST_KeyValue.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_BEPointDefinitions.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_BoardLengthTest.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_BoardLengthTestData.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_ConveyorData.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_MGBDoor_HMIStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_DualChannel_HMIStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_MotorControls_NonStandard.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_OutfeedConveyorStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_PackML_Control.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_PackML_Control_Simplified.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_RecoveryBoardList.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_SysConfig.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\WaitSync\E_EM_Index.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\WaitSync\E_WaitSync.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\WaitSync\ST_WaitSyncManager.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GlobalTextList.TcGTLO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="GVLs\Global.TcGVL">
+      <SubType>Code</SubType>
+      <LinkAlways>true</LinkAlways>
+    </Compile>
+    <Compile Include="Machine\Components\BasicSlaveAxis_SOE\FB_Component_BasicSlaveAxis_SoE.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\ComponentBase_SR\FB_ComponentBase_SR.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\ComponentBase_SR\Interfaces\I_ComponentBase_SR.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\ControlPendant\FB_ControlPendant.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Button\FB_Component_Button.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\ControlPendant\FB_ControlPendant_Outfeed.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Conveyor\FB_Conveyor.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\DoubleSolenoidRetractFeedback\FB_DoubleSolenoidRetractFeedback.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\DualChannelIndicator\FB_DualChannelMonitor.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Indicator\DUTs\HMI\ST_Indicator_Command.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Indicator\DUTs\HMI\ST_Indicator_Config.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Indicator\DUTs\HMI\ST_Indicator_HMI.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Indicator\DUTs\HMI\ST_Indicator_Status.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Indicator\FB_Component_Indicator.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Indicator\Interfaces\I_Indicator.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\BasicSlaveAxis_SOE\DUTs\HMI\ST_MyComponent_Command_1.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\BasicSlaveAxis_SOE\DUTs\HMI\ST_MyComponent_Config_1.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\BasicSlaveAxis_SOE\DUTs\HMI\ST_MyComponent_HMI_1.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\BasicSlaveAxis_SOE\DUTs\HMI\ST_MyComponent_Status_1.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Preplate_Rack\DUTs\E_RackState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Preplate_Rack\DUTs\linked_racks_typ.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Preplate_Rack\DUTs\RackStateMachine.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Preplate_Rack\DUTs\RackStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Preplate_Rack\FB_Component_Preplate_Rack.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Robot\DUTs\ST_Robot_Handshake_Input.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Robot\DUTs\ST_Robot_Handshake_IO.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Robot\DUTs\ST_Robot_Handshake_Output.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\VFD\FB_Component_ABB_VFD_EC.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\VFD\FB_Component_ABB_VFD_EIP.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\MGB_Door\FB_Component_MGB_Door.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Robot\FB_Component_Robot.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\DUTs\ST_IRC5_Input.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\DUTs\ST_IRC5_IO.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\DUTs\ST_IRC5_Output.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Safety\FB_Component_Safety.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\StackLight\FB_Component_Stacklight.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\StackLight\Interfaces\I_StackLight.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\StackLight_MBI\FB_Component_Stacklight_MBI.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\StackLight_MBI\Interfaces\I_StackLight_1.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Template_MyComponent\DUTs\HMI\ST_MyComponent_Command.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Template_MyComponent\DUTs\HMI\ST_MyComponent_Config.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Template_MyComponent\DUTs\HMI\ST_MyComponent_HMI.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Template_MyComponent\DUTs\HMI\ST_MyComponent_Status.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Template_MyComponent\FB_Component_MyComponent.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\Template_MyComponent\Interfaces\I_MyComponent.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\DUTs\HMI\ST_IRC5_Command.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\DUTs\HMI\ST_IRC5_Config.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\DUTs\HMI\ST_IRC5_HMI.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\DUTs\HMI\ST_IRC5_Status.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\FB_Component_IRC5.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\IRC5\Interfaces\I_IRC5.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\Components\VFD\Interfaces\I_VFD.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\EquipmentModule_SR\FB_EquipmentModule_SR.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\EquipmentModule_SR\Interfaces\I_CommandStepParser.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\EquipmentModule_SR\Interfaces\I_CommandSteps.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\EquipmentModule_SR\Interfaces\I_EquipmentModule_SR.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\EquipmentModule_SR\Interfaces\I_MachineComms.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Infeed.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Carriage.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Handoff.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_MBI.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Outfeed_Jig.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Press.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Preplate.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Robot_PrePlate.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Robot_Press.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Robot_Outfeed.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Functional Layer\FB_Robot.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\Info Layer\_FB_EquipmentModule_Info.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\E_ContentType.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\E_MessageCategory.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\E_MessageStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\E_SAMCommStateMachine.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\E_TaskState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_Alert.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_Message.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_Messages.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_PLC.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_RFT.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_Status.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_Task.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_TaskREF.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_TaskStatus.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\DUTs\ST_Task_Info.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\FB_ClientConnection.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\FB_SamComm.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\Helper POUs\FB_FrameFifo.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\EquipmentModules\SamComm\Helper POUs\FB_LogFifo.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\FunctionBlocks\Occupy Press Street\E_GateKeeperState.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\FunctionBlocks\Occupy Press Street\ST_MediatorInterface.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\FunctionBlocks\PulseGenerator\FB_PulseGenerator.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\FunctionBlocks\PulseGenerator\Interfaces\I_PulseGenerator.TcIO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\HMI Connections\FB_ControlSource_HMI.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\HMI Connections\FB_ControlSource_MBI.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Machine\HMI Connections\FB_ControlSource_HMI_Machine.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="PlcTask.TcTTO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="RecipeManager.TcRMO">
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="DUTs" />
+    <Folder Include="DUTs\Motion" />
+    <Folder Include="DUTs\MessageBoxes" />
+    <Folder Include="DUTs\DB_Logging" />
+    <Folder Include="DUTs\WaitSync" />
+    <Folder Include="DUTs\Recipe" />
+    <Folder Include="GVLs" />
+    <Folder Include="Machine" />
+    <Folder Include="Machine\Components" />
+    <Folder Include="Machine\Components\ComponentBase_SR" />
+    <Folder Include="Machine\Components\ComponentBase_SR\Interfaces" />
+    <Folder Include="Machine\Components\ControlPendant" />
+    <Folder Include="Machine\Components\ControlPendant\DUTs" />
+    <Folder Include="Machine\Components\ControlPendant\Interfaces" />
+    <Folder Include="Machine\Components\Button" />
+    <Folder Include="Machine\Components\Button\DUTs" />
+    <Folder Include="Machine\Components\Button\Interfaces" />
+    <Folder Include="Machine\Components\Conveyor\DUTs" />
+    <Folder Include="Machine\Components\Conveyor\DUTs\HMI" />
+    <Folder Include="Machine\Components\Conveyor\Interfaces" />
+    <Folder Include="Machine\Components\DoubleSolenoidRetractFeedback\DUT" />
+    <Folder Include="Machine\Components\DoubleSolenoidRetractFeedback\Interfaces" />
+    <Folder Include="Machine\Components\Indicator" />
+    <Folder Include="Machine\Components\Indicator\DUTs" />
+    <Folder Include="Machine\Components\Indicator\DUTs\HMI" />
+    <Folder Include="Machine\Components\Indicator\Interfaces" />
+    <Folder Include="Machine\Components\BasicSlaveAxis_SOE" />
+    <Folder Include="Machine\Components\BasicSlaveAxis_SOE\DUTs" />
+    <Folder Include="Machine\Components\BasicSlaveAxis_SOE\DUTs\HMI" />
+    <Folder Include="Machine\Components\BasicSlaveAxis_SOE\Interfaces" />
+    <Folder Include="Machine\Components\DoubleSolenoidRetractFeedback" />
+    <Folder Include="Machine\Components\Conveyor" />
+    <Folder Include="Machine\Components\DualChannelIndicator" />
+    <Folder Include="Machine\Components\Preplate_Rack" />
+    <Folder Include="Machine\Components\Preplate_Rack\DUTs" />
+    <Folder Include="Machine\Components\Preplate_Rack\DUTs\HMI" />
+    <Folder Include="Machine\Components\Preplate_Rack\Interfaces" />
+    <Folder Include="Machine\Components\VFD" />
+    <Folder Include="Machine\Components\VFD\DUTs" />
+    <Folder Include="Machine\Components\VFD\DUTs\HMI" />
+    <Folder Include="Machine\Components\VFD\Interfaces" />
+    <Folder Include="Machine\Components\MGB_Door" />
+    <Folder Include="Machine\Components\MGB_Door\DUTs" />
+    <Folder Include="Machine\Components\MGB_Door\DUTs\HMI" />
+    <Folder Include="Machine\Components\MGB_Door\Interfaces" />
+    <Folder Include="Machine\Components\Safety" />
+    <Folder Include="Machine\Components\Safety\DUTs" />
+    <Folder Include="Machine\Components\Safety\DUTs\HMI" />
+    <Folder Include="Machine\Components\Safety\Interfaces" />
+    <Folder Include="Machine\Components\StackLight_MBI" />
+    <Folder Include="Machine\Components\Robot" />
+    <Folder Include="Machine\Components\Robot\DUTs" />
+    <Folder Include="Machine\Components\Robot\Interfaces" />
+    <Folder Include="Machine\Components\StackLight_MBI\Interfaces" />
+    <Folder Include="Machine\Components\Template_MyComponent" />
+    <Folder Include="Machine\Components\Template_MyComponent\DUTs" />
+    <Folder Include="Machine\Components\Template_MyComponent\DUTs\HMI" />
+    <Folder Include="Machine\Components\StackLight" />
+    <Folder Include="Machine\Components\StackLight\DUTs" />
+    <Folder Include="Machine\Components\StackLight\DUTs\HMI" />
+    <Folder Include="Machine\Components\StackLight\Interfaces" />
+    <Folder Include="Machine\Components\Template_MyComponent\Interfaces" />
+    <Folder Include="Machine\Components\IRC5" />
+    <Folder Include="Machine\Components\IRC5\DUTs" />
+    <Folder Include="Machine\Components\IRC5\DUTs\HMI" />
+    <Folder Include="Machine\Components\IRC5\Interfaces" />
+    <Folder Include="Machine\EquipmentModules" />
+    <Folder Include="Machine\EquipmentModules\EquipmentModule_SR" />
+    <Folder Include="Machine\EquipmentModules\EquipmentModule_SR\Interfaces" />
+    <Folder Include="Machine\EquipmentModules\Functional Layer" />
+    <Folder Include="Machine\EquipmentModules\Info Layer" />
+    <Folder Include="Machine\EquipmentModules\SamComm" />
+    <Folder Include="Machine\EquipmentModules\SamComm\DUTs" />
+    <Folder Include="Machine\EquipmentModules\SamComm\DUTs\HMI" />
+    <Folder Include="Machine\EquipmentModules\SamComm\Helper POUs" />
+    <Folder Include="Machine\EquipmentModules\Templates" />
+    <Folder Include="Machine\Events" />
+    <Folder Include="Machine\FunctionBlocks\Occupy Press Street" />
+    <Folder Include="Machine\FunctionBlocks\PulseGenerator" />
+    <Folder Include="Machine\FunctionBlocks\PulseGenerator\Interfaces" />
+    <Folder Include="Machine\HMI Connections" />
+    <Folder Include="Machine\FunctionBlocks" />
+  </ItemGroup>
+  <ItemGroup>
+    <PlaceholderReference Include="RecipeManagement">
+      <DefaultResolution>Recipe Management, * (System)</DefaultResolution>
+      <Namespace>Recipe_Management</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="SPT Base Types">
+      <DefaultResolution>SPT Base Types, * (Beckhoff Automation LLC)</DefaultResolution>
+      <Namespace>SPT_BaseTypes</Namespace>
+      <Parameters>
+        <Parameter ListName="PARAMETERS_BASECOMPONENT">
+          <Key>INHIBIT_SIMULATION_WARNING</Key>
+          <Value>TRUE</Value>
+        </Parameter>
+      </Parameters>
+    </PlaceholderReference>
+    <PlaceholderReference Include="SPT Components">
+      <DefaultResolution>SPT Components, * (Beckhoff Automation LLC)</DefaultResolution>
+      <Namespace>SPT_Components</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="SPT Event Logger">
+      <DefaultResolution>SPT Event Logger, * (Beckhoff Automation LLC)</DefaultResolution>
+      <Namespace>SPT_EventLogger</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="SPT Motion Control">
+      <DefaultResolution>SPT Motion Control, * (Beckhoff Automation LLC)</DefaultResolution>
+      <Namespace>SPT_Motion_Control</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_NcDrive">
+      <DefaultResolution>Tc2_NcDrive, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_NcDrive</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_Standard">
+      <DefaultResolution>Tc2_Standard, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_Standard</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_System">
+      <DefaultResolution>Tc2_System, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_System</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_TcpIp">
+      <DefaultResolution>Tc2_TcpIp, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_TcpIp</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc2_Utilities">
+      <DefaultResolution>Tc2_Utilities, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc2_Utilities</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc3_Database">
+      <DefaultResolution>Tc3_Database, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc3_Database</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc3_EventLogger">
+      <DefaultResolution>Tc3_EventLogger, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc3_EventLogger</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc3_JsonXml">
+      <DefaultResolution>Tc3_JsonXml, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc3_JsonXml</Namespace>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc3_Module">
+      <DefaultResolution>Tc3_Module, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc3_Module</Namespace>
+      <SystemLibrary>true</SystemLibrary>
+    </PlaceholderReference>
+    <PlaceholderReference Include="Tc3_PackML_V2">
+      <DefaultResolution>Tc3_PackML_V2, * (Beckhoff Automation GmbH)</DefaultResolution>
+      <Namespace>Tc3_PackML_V2</Namespace>
+    </PlaceholderReference>
+  </ItemGroup>
+  <ItemGroup>
+    <PlaceholderResolution Include="System_VisuElemMeter">
+      <Resolution>VisuElemMeter, * (System)</Resolution>
+    </PlaceholderResolution>
+    <PlaceholderResolution Include="System_VisuElems">
+      <Resolution>VisuElems, * (System)</Resolution>
+    </PlaceholderResolution>
+    <PlaceholderResolution Include="System_VisuElemsSpecialControls">
+      <Resolution>VisuElemsSpecialControls, * (System)</Resolution>
+    </PlaceholderResolution>
+    <PlaceholderResolution Include="System_VisuElemsWinControls">
+      <Resolution>VisuElemsWinControls, * (System)</Resolution>
+    </PlaceholderResolution>
+    <PlaceholderResolution Include="System_VisuElemTextEditor">
+      <Resolution>VisuElemTextEditor, * (System)</Resolution>
+    </PlaceholderResolution>
+    <PlaceholderResolution Include="System_VisuNativeControl">
+      <Resolution>VisuNativeControl, * (System)</Resolution>
+    </PlaceholderResolution>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="AMD.tmc">
+      <SubType>Content</SubType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Machine\Events\AMDTruss.tmc">
+      <SubType>Content</SubType>
+    </Content>
+  </ItemGroup>
+  <ProjectExtensions>
+    <PlcProjectOptions>
+      <XmlArchive>
+  <Data>
+    <o xml:space="preserve" t="OptionKey">
+      <v n="Name">"&lt;ProjectRoot&gt;"</v>
+      <d n="SubKeys" t="Hashtable" ckt="String" cvt="OptionKey">
+        <v>{192FAD59-8248-4824-A8DE-9177C94C195A}</v>
+        <o>
+          <v n="Name">"{192FAD59-8248-4824-A8DE-9177C94C195A}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" />
+        </o>
+        <v>{246001F4-279D-43AC-B241-948EB31120E1}</v>
+        <o>
+          <v n="Name">"{246001F4-279D-43AC-B241-948EB31120E1}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+            <v>GeneralPropertySupport</v>
+            <v>True</v>
+            <v>UnicodeStrings</v>
+            <v>False</v>
+          </d>
+        </o>
+        <v>{29BD8D0C-3586-4548-BB48-497B9A01693F}</v>
+        <o>
+          <v n="Name">"{29BD8D0C-3586-4548-BB48-497B9A01693F}"</v>
+          <d n="SubKeys" t="Hashtable" ckt="String" cvt="OptionKey">
+            <v>NamingConventions</v>
+            <o>
+              <v n="Name">"NamingConventions"</v>
+              <d n="SubKeys" t="Hashtable" />
+              <d n="Values" t="Hashtable" />
+            </o>
+            <v>Rules</v>
+            <o>
+              <v n="Name">"Rules"</v>
+              <d n="SubKeys" t="Hashtable" ckt="String" cvt="OptionKey">
+                <v>167</v>
+                <o>
+                  <v n="Name">"167"</v>
+                  <d n="SubKeys" t="Hashtable" />
+                  <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+                    <v>bActive</v>
+                    <v>False</v>
+                  </d>
+                </o>
+                <v>175</v>
+                <o>
+                  <v n="Name">"175"</v>
+                  <d n="SubKeys" t="Hashtable" />
+                  <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+                    <v>bActive</v>
+                    <v>False</v>
+                  </d>
+                </o>
+                <v>27</v>
+                <o>
+                  <v n="Name">"27"</v>
+                  <d n="SubKeys" t="Hashtable" />
+                  <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+                    <v>bActive</v>
+                    <v>False</v>
+                  </d>
+                </o>
+                <v>28</v>
+                <o>
+                  <v n="Name">"28"</v>
+                  <d n="SubKeys" t="Hashtable" />
+                  <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+                    <v>bActive</v>
+                    <v>False</v>
+                  </d>
+                </o>
+                <v>33</v>
+                <o>
+                  <v n="Name">"33"</v>
+                  <d n="SubKeys" t="Hashtable" />
+                  <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+                    <v>bActive</v>
+                    <v>False</v>
+                  </d>
+                </o>
+                <v>4</v>
+                <o>
+                  <v n="Name">"4"</v>
+                  <d n="SubKeys" t="Hashtable" />
+                  <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+                    <v>bActive</v>
+                    <v>True</v>
+                  </d>
+                </o>
+                <v>6</v>
+                <o>
+                  <v n="Name">"6"</v>
+                  <d n="SubKeys" t="Hashtable" />
+                  <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+                    <v>bActive</v>
+                    <v>False</v>
+                  </d>
+                </o>
+              </d>
+              <d n="Values" t="Hashtable" />
+            </o>
+          </d>
+          <d n="Values" t="Hashtable" />
+        </o>
+        <v>{40450F57-0AA3-4216-96F3-5444ECB29763}</v>
+        <o>
+          <v n="Name">"{40450F57-0AA3-4216-96F3-5444ECB29763}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" ckt="String" cvt="String">
+            <v>ActiveVisuProfile</v>
+            <v>IR0whWr8bwcQCAAAY7rhNAAAAACAAgAAGMPQIgAAAAABAAAAAAAAAAEaUwB5AHMAdABlAG0ALgBTAHQAcgBpAG4AZwACTHsAZgA5ADUAYgBiADQAMgA2AC0ANQA1ADIANAAtADQAYgA0ADUALQA5ADQAMAAwAC0AZgBiADAAZgAyAGUANwA3AGUANQAxAGIAfQADCE4AYQBtAGUABDBUAHcAaQBuAEMAQQBUACAAMwAuADEAIABCAHUAaQBsAGQAIAA0ADAAMgA2AC4ANwAFFlAAcgBvAGYAaQBsAGUARABhAHQAYQAGTHsAMQA2AGUANQA1AGIANgAwAC0ANwAwADQAMwAtADQAYQA2ADMALQBiADYANQBiAC0ANgAxADQANwAxADMAOAA3ADgAZAA0ADIAfQAHEkwAaQBiAHIAYQByAGkAZQBzAAhMewAzAGIAZgBkADUANAA1ADkALQBiADAANwBmAC0ANABkADYAZQAtAGEAZQAxAGEALQBhADgAMwAzADUANgBhADUANQAxADQAMgB9AAlMewA5AGMAOQA1ADgAOQA2ADgALQAyAGMAOAA1AC0ANAAxAGIAYgAtADgAOAA3ADEALQA4ADkANQBmAGYAMQBmAGUAZABlADEAYQB9AAoOVgBlAHIAcwBpAG8AbgALBmkAbgB0AAwKVQBzAGEAZwBlAA0KVABpAHQAbABlAA4aVgBpAHMAdQBFAGwAZQBtAE0AZQB0AGUAcgAPDkMAbwBtAHAAYQBuAHkAEAxTAHkAcwB0AGUAbQARElYAaQBzAHUARQBsAGUAbQBzABIwVgBpAHMAdQBFAGwAZQBtAHMAUwBwAGUAYwBpAGEAbABDAG8AbgB0AHIAbwBsAHMAEyhWAGkAcwB1AEUAbABlAG0AcwBXAGkAbgBDAG8AbgB0AHIAbwBsAHMAFCRWAGkAcwB1AEUAbABlAG0AVABlAHgAdABFAGQAaQB0AG8AcgAVIlYAaQBzAHUATgBhAHQAaQB2AGUAQwBvAG4AdAByAG8AbAAWHlYAaQBzAHUARQBsAGUAbQBYAFkAQwBoAGEAcgB0ABcUVgBpAHMAdQBJAG4AcAB1AHQAcwAYGFYAaQBzAHUARQBsAGUAbQBCAGEAcwBlABkmRABlAHYAUABsAGEAYwBlAGgAbwBsAGQAZQByAHMAVQBzAGUAZAAaCGIAbwBvAGwAGyJQAGwAdQBnAGkAbgBDAG8AbgBzAHQAcgBhAGkAbgB0AHMAHEx7ADQAMwBkADUAMgBiAGMAZQAtADkANAAyAGMALQA0ADQAZAA3AC0AOQBlADkANAAtADEAYgBmAGQAZgAzADEAMABlADYAMwBjAH0AHRxBAHQATABlAGEAcwB0AFYAZQByAHMAaQBvAG4AHhRQAGwAdQBnAGkAbgBHAHUAaQBkAB8WUwB5AHMAdABlAG0ALgBHAHUAaQBkACBIYQBmAGMAZAA1ADQANAA2AC0ANAA5ADEANAAtADQAZgBlADcALQBiAGIANwA4AC0AOQBiAGYAZgBlAGIANwAwAGYAZAAxADcAIRRVAHAAZABhAHQAZQBJAG4AZgBvACJMewBiADAAMwAzADYANgBhADgALQBiADUAYwAwAC0ANABiADkAYQAtAGEAMAAwAGUALQBlAGIAOAA2ADAAMQAxADEAMAA0AGMAMwB9ACMOVQBwAGQAYQB0AGUAcwAkTHsAMQA4ADYAOABmAGYAYwA5AC0AZQA0AGYAYwAtADQANQAzADIALQBhAGMAMAA2AC0AMQBlADMAOQBiAGIANQA1ADcAYgA2ADkAfQAlTHsAYQA1AGIAZAA0ADgAYwAzAC0AMABkADEANwAtADQAMQBiADUALQBiADEANgA0AC0ANQBmAGMANgBhAGQAMgBiADkANgBiADcAfQAmFk8AYgBqAGUAYwB0AHMAVAB5AHAAZQAnVFUAcABkAGEAdABlAEwAYQBuAGcAdQBhAGcAZQBNAG8AZABlAGwARgBvAHIAQwBvAG4AdgBlAHIAdABpAGIAbABlAEwAaQBiAHIAYQByAGkAZQBzACgQTABpAGIAVABpAHQAbABlACkUTABpAGIAQwBvAG0AcABhAG4AeQAqHlUAcABkAGEAdABlAFAAcgBvAHYAaQBkAGUAcgBzACs4UwB5AHMAdABlAG0ALgBDAG8AbABsAGUAYwB0AGkAbwBuAHMALgBIAGEAcwBoAHQAYQBiAGwAZQAsEnYAaQBzAHUAZQBsAGUAbQBzAC0McwB5AHMAdABlAG0ALkg2AGMAYgAxAGMAZABlADEALQBkADUAZABjAC0ANABhADMAYgAtADkAMAA1ADQALQAyADEAZgBhADcANQA2AGEAMwBmAGEANAAvKEkAbgB0AGUAcgBmAGEAYwBlAFYAZQByAHMAaQBvAG4ASQBuAGYAbwAwTHsAYwA2ADEAMQBlADQAMAAwAC0ANwBmAGIAOQAtADQAYwAzADUALQBiADkAYQBjAC0ANABlADMAMQA0AGIANQA5ADkANgA0ADMAfQAxGE0AYQBqAG8AcgBWAGUAcgBzAGkAbwBuADIYTQBpAG4AbwByAFYAZQByAHMAaQBvAG4AMwxMAGUAZwBhAGMAeQA0MEwAYQBuAGcAdQBhAGcAZQBNAG8AZABlAGwAVgBlAHIAcwBpAG8AbgBJAG4AZgBvADUwTABvAGEAZABMAGkAYgByAGEAcgBpAGUAcwBJAG4AdABvAFAAcgBvAGoAZQBjAHQANhpDAG8AbQBwAGEAdABpAGIAaQBsAGkAdAB5ANAAAhoD0AMBLQTQBQYaB9AHCBoBRQcJCdAACRoERQoLBAQAAAAGAAAAAAAAAAAAAADQDAutAgAAANANAS0O0A8BLRDQAAkaBEUKCwQEAAAABgAAAAAAAAAAAAAA0AwLrQEAAADQDQEtEdAPAS0Q0AAJGgRFCgsEBAAAAAYAAAAAAAAAAAAAANAMC60CAAAA0A0BLRLQDwEtENAACRoERQoLBAQAAAAGAAAAAAAAAAAAAADQDAutAgAAANANAS0T0A8BLRDQAAkaBEUKCwQEAAAABgAAAAAAAAAAAAAA0AwLrQIAAADQDQEtFNAPAS0Q0AAJGgRFCgsEBAAAAAYAAAAAAAAAAAAAANAMC60CAAAA0A0BLRXQDwEtENAACRoERQoLBAQAAAAGAAAAAAAAAAAAAADQDAutAgAAANANAS0W0A8BLRDQAAkaBEUKCwQEAAAABgAAAAAAAAAAAAAA0AwLrQIAAADQDQEtF9APAS0Q0AAJGgRFCgsEBAAAAAYAAAAAAAAAAAAAANAMC60EAAAA0A0BLRjQDwEtENAZGq0BRRscAdAAHBoCRR0LBAQAAAACAAAAAAAAAAAAAADQHh8tINAhIhoCRSMkAtAAJRoFRQoLBAMAAAADAAAAAAAAAAoAAADQJgutAAAAANADAS0n0CgBLRHQKQEtENAAJRoFRQoLBAMAAAADAAAAAAAAAAoAAADQJgutAQAAANADAS0n0CgBLRHQKQEtEJoqKwFFAAEC0AABLSzQAAEtLdAAHy0u0C8wGgPQMQutAQAAANAyC60jAAAA0DMarQDQNDAaA9AxC60CAAAA0DILrQYAAADQMxqtANA1Gq0A0DYarQA=</v>
+          </d>
+        </o>
+        <v>{8A0FB252-96EB-4DCC-A5B4-B4804D05E2D6}</v>
+        <o>
+          <v n="Name">"{8A0FB252-96EB-4DCC-A5B4-B4804D05E2D6}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+            <v>WriteLineIDs</v>
+            <v>False</v>
+          </d>
+        </o>
+        <v>{8F99A816-E488-41E4-9FA3-846536012284}</v>
+        <o>
+          <v n="Name">"{8F99A816-E488-41E4-9FA3-846536012284}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" ckt="String" cvt="String">
+            <v>DisabledWarningIds</v>
+            <v>410,5410</v>
+          </d>
+        </o>
+        <v>{F66C7017-BDD8-4114-926C-81D6D687E35F}</v>
+        <o>
+          <v n="Name">"{F66C7017-BDD8-4114-926C-81D6D687E35F}"</v>
+          <d n="SubKeys" t="Hashtable" />
+          <d n="Values" t="Hashtable" ckt="String" cvt="Boolean">
+            <v>CalcActiveTransOnly</v>
+            <v>True</v>
+          </d>
+        </o>
+      </d>
+      <d n="Values" t="Hashtable" />
+    </o>
+  </Data>
+  <TypeList>
+    <Type n="Boolean">System.Boolean</Type>
+    <Type n="Hashtable">System.Collections.Hashtable</Type>
+    <Type n="OptionKey">{54dd0eac-a6d8-46f2-8c27-2f43c7e49861}</Type>
+    <Type n="String">System.String</Type>
+  </TypeList>
+</XmlArchive>
+    </PlcProjectOptions>
+  </ProjectExtensions>
+</Project>

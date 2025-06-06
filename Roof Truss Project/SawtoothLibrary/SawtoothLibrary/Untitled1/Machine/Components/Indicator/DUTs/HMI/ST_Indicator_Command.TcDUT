@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Indicator_Command" Id="{53b2856c-8617-489e-bbff-79f772db084a}">
+    <Declaration><![CDATA[TYPE
+    ST_Indicator_Command : STRUCT
+        TurnOn  : BOOL;
+        TurnOff : BOOL;
+        Flash   : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

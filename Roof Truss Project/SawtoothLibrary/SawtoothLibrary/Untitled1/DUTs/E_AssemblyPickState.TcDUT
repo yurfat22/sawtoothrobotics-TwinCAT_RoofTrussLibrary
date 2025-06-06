@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_AssemblyPickState" Id="{846ae350-ab80-426e-9f09-bbe25ca8fa07}">
+    <Declaration><![CDATA[{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_AssemblyPickState : (
+        BOARD_READY_WS        := 0,
+        OPEN_GRIPPERS_WS      := 20,
+        OPEN_GRIPPERS         := 30,
+        PICKING_BOARD_WS      := 35,
+        BOARD_CLEAR_WS        := 40,
+        PICK_DONE             := 50,
+        SIM_JIG2READYPLACE_WS := 200,
+        SIM_JIG2PLACEDONE_WS  := 201,
+        SIM_JIG3READYPLACE_WS := 202,
+        SIM_JIG3PLACEDONE_WS  := 203,
+        PICK_ERROR            := 999
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

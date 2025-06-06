@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_IRC5_IO" Id="{89750d1a-71a6-4657-88b5-835a328ccbd7}">
+    <Declaration><![CDATA[TYPE
+    ST_IRC5_IO : STRUCT
+        IN  : ST_IRC5_Input;
+        OUT : ST_IRC5_Output;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

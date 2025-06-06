@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_MachineComms" Id="{73c4e4ba-16fb-4337-931d-e5ca6164b37b}">
+    <Declaration><![CDATA[INTERFACE I_MachineComms extends I_PackML_BaseModule]]></Declaration>
+    <Property Name="Step" Id="{4b966bd7-89e7-4ad0-beca-e2ecf21c7644}">
+      <Declaration><![CDATA[PROPERTY Step : DINT]]></Declaration>
+      <Set Name="Set" Id="{aefb6ec3-d92d-4c60-b461-ce4d1fcd9812}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="WaitSync" Id="{67cfe2fe-059e-46e4-934b-6eb291af2861}">
+      <Declaration><![CDATA[PROPERTY WaitSync : E_WaitSync]]></Declaration>
+      <Get Name="Get" Id="{91d83af3-e80e-4d6b-88fa-2bc05b297d8d}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{1d001ec1-7ff5-437a-aa4c-77372c6c1495}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+  </Itf>
+</TcPlcObject>

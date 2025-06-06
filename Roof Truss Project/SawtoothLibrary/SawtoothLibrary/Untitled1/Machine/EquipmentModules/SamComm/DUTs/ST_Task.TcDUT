@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Task" Id="{c24c319c-1e59-4891-ad8b-0f1f47532763}">
+    <Declaration><![CDATA[{attribute 'to_string'}
+TYPE
+    ST_Task : STRUCT
+        Info          : ST_Task_Info;
+        Data          : STRING[25000]; //Build Data from CSV/Json body from SAM
+        CSV           : ST_CSV;
+        StatusUpdate  : BOOL; // Send Status Update
+        RFT_Requested : BOOL; // RFT Sent Out
+        StepTimer     : TON; // Timer for 1-second delay    
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

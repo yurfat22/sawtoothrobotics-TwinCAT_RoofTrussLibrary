@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_IndexConveyor" Id="{6d236d4d-6b04-4d2e-b3d7-16c78dc361a6}">
+    <Declaration><![CDATA[TYPE
+    ST_IndexConveyor : STRUCT
+        ConvIndex : INT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

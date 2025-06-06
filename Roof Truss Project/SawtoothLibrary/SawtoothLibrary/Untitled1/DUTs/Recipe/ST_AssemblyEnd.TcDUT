@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_AssemblyEnd" Id="{fcc54c7e-1c2d-40ce-a825-5ea4a7590304}">
+    <Declaration><![CDATA[TYPE
+    ST_AssemblyEnd : STRUCT
+        SeqID : UDINT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

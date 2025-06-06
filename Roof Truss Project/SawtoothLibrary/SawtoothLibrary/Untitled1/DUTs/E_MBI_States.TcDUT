@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_MBI_States" Id="{d4aff39d-ab05-45bc-95ea-c2139be74f97}">
+    <Declaration><![CDATA[{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_MBI_States : (
+        acIDLE                := 0,
+        acINDEX_FORWARD       := 1,
+        acINDEX_TO_DOG_SENSOR := 2,
+        acWAIT_INFEED_READY   := 3,
+        acDUMP_BOARD          := 4,
+        acTOP_SPOT_POPULATED  := 5,
+        acBOARD_LOST          := 6,
+        acSTOP                := 7,
+        acWAIT_READY          := 8,
+        FORWARD               := 9,
+        acERROR               := 999
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

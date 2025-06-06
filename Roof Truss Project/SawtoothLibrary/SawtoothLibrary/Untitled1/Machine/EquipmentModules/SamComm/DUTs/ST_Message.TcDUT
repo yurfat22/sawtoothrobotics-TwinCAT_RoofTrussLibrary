@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Message" Id="{71a03a2b-d16d-40ca-94f7-c7f5b036fd37}">
+    <Declaration><![CDATA[TYPE
+    ST_Message : STRUCT
+        content_type : E_ContentType;
+        data         : STRING[1000];
+        data_len     : UDINT;
+        status       : E_MessageStatus;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

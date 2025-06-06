@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_BoardData" Id="{15f547ac-e0d6-4b6e-bd30-048f85081fdb}">
+    <Declaration><![CDATA[TYPE
+    ST_BoardData : STRUCT
+        BoardID                       : STRING;
+        BoardWidth                    : REAL;
+        BoardHeight                   : REAL;
+        BoardLength                   : REAL;
+        BoardLength_Measured          : BOOL;
+        BoardNumber                   : INT;
+        Plates_Total                  : UDINT;
+        Plates_Placed                 : UDINT;
+        TotalPlateCount_Data_Received : BOOL;
+        LeadingEdgeBevelOffset        : REAL;
+        TrailingEdgeBevelOffset       : REAL;
+        PickOffset                    : REAL;
+        DoublePickNeeded              : BOOL;
+        DoublePickVerified            : BOOL;
+        DoublePicked                  : BOOL;
+        IgnoreSensors                 : BOOL;
+        FrontEdgePos                  : REAL;
+        BackEdgePos                   : REAL;
+        LocationStr                   : STRING;
+        LengthFormatted_str           : STRING;
+        Positions                     : ARRAY[1..MAX_NUMBER_OF_POSITIONS] OF ST_PositionInfo;
+        Plates                        : ARRAY[1..MAX_NUMBER_OF_PLATES] OF ST_PlateInfo;
+        PickPlaceInfo                 : ST_PickPlaceDetail; // Pick and Place Data Specific to Outfeed
+        ConveyorIndexInfo             : INT; // Conveyor Index data for Outfeed
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

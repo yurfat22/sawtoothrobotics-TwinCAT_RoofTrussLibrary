@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_HomingParams" Id="{0552d86d-8f75-48d3-840c-16d043ab9c51}">
+    <Declaration><![CDATA[TYPE
+    ST_HomingParams : STRUCT
+        ReadParams               : SPT_Motion_Control.MC_ReadParameter;
+        WriteNegLim              : SPT_Motion_Control.MC_WriteBoolParameter;
+        WritePosLim              : SPT_Motion_Control.MC_WriteBoolParameter;
+        AxisParams               : SPT_Motion_Control.MC_AxisParameter;
+        SetPositionHomingRoutine : FB_HomeRoutine_SetPosition;
+        TorqueControl            : SPT_Motion_Control.MC_TorqueControl;
+        TorqueControlParams      : SPT_Motion_Control.ST_TorqueControlOptions;
+        HardStopHomingRoutine    : FB_HomeRoutine_HardStop;
+        HardStopHomingParams     : ST_StepBlockLagBasedParameters;
+        SetPositionOffset        : SPT_Motion_Control.FB_CoEAX8000SetPositionOffset;
+        HomingTON                : TON;
+        Execute_WriteLimit       : BOOL;
+        EnablePosLim             : BOOL;
+        EnableNegLim             : BOOL;
+        HomingState              : DINT;
+        HomePosMax               : LREAL;
+        HomePosMin               : LREAL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

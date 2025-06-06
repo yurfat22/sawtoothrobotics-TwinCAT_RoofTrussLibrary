@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_FrameFifo" Id="{569e7401-3710-4598-aa05-b54586d01ffc}" SpecialFunc="None">
+    <Declaration><![CDATA[(* Tx/Rx (string data) fifo control function block *)
+FUNCTION_BLOCK FB_FrameFifo
+VAR_INPUT
+    bLog    : BOOL   := FALSE; (* TRUE => Enable log message output, FALSE => Disable *)
+    sPrefix : STRING := 'Unknown::'; (* Log message description string (allows the identification of log message source) *)
+    putObj  : STRING[25000];
+    //	sPut		: T_MaxString 	:= ''; (* String message to add (write) to the fifo *)
+END_VAR
+
+VAR_OUTPUT
+    bOk    : BOOL; (* TRUE = New entry added or removed succesfully, FALSE = Fifo overflow or fifo empty *)
+    getObj : STRING[25000];
+    nCount : UDINT := 0; (* Number of fifo entries *)
+    cbFree : UDINT := 0; (* Free buffer space *)
+END_VAR
+
+VAR
+    bReset                         : BOOL := TRUE;
+    bAdd, bGet, bRelease, bGetFree : BOOL;
+    cbSize                         : UDINT;
+    fbBuffer                       : FB_MemRingBufferEx;
+    buffer                         : ARRAY[-3..PLCPRJ_BUFFER_SIZE] OF BYTE; (* Internal buffer memory *)
+    _Send                          : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[;]]></ST>
+    </Implementation>
+    <Action Name="AddTail" Id="{9d0bf65e-4eae-4c60-aab3-4fa78b6cb7ba}">
+      <Implementation>
+        <ST><![CDATA[(* Adds new fifo entry *)
+fbBuffer.A_AddTail(pBuffer  := ADR(buffer),
+                   cbBuffer := SIZEOF(buffer),
+                   pWrite   := ADR(putObj),
+                   cbWrite  := SIZEOF(putObj),
+                   bOk      => bOk,
+                   nCount   => nCount,
+                   cbSize   => cbSize,
+                   cbFree   => cbFree);
+
+IF bOk THEN
+    cbFree := PLCPRJ_BUFFER_SIZE - fbBuffer.cbSize; (* Calculate the free buffer space *)
+
+    IF bLog THEN (* Log message *)
+        ADSLOGSTR(ADSLOG_MSGTYPE_HINT OR ADSLOG_MSGTYPE_LOG, CONCAT(sPrefix, '<="%s"'), putObj);
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="Clear" Id="{2d5c5598-7e6c-4d5d-a847-96a551240a71}">
+      <Implementation>
+        <ST><![CDATA[(* Resets fifo = clears all data *)
+fbBuffer.A_Reset(pBuffer  := ADR(buffer),
+                 cbBuffer := SIZEOF(buffer),
+                 bOk      => bOk,
+                 nCount   => nCount,
+                 cbSize   => cbSize,
+                 cbFree   => cbFree);
+
+cbFree := PLCPRJ_BUFFER_SIZE; (* Free buffer size *)]]></ST>
+      </Implementation>
+    </Action>
+    <Action Name="RemoveHead" Id="{09e2e3a4-2746-472b-aa8a-c0b08262dbf7}">
+      <Implementation>
+        <ST><![CDATA[(* Removes oldest fifo entry *)
+fbBuffer.A_GetHead(pBuffer  := ADR(buffer),
+                   cbBuffer := SIZEOF(buffer),
+                   bOk      => bOk,
+                   nCount   => nCount,
+                   cbSize   => cbSize,
+                   cbFree   => cbFree);
+
+IF bOk THEN
+    MEMCPY(ADR(getObj), fbBuffer.pRead, MIN(SIZEOF(getObj), fbBuffer.cbRead));
+    cbFree := PLCPRJ_BUFFER_SIZE - fbBuffer.cbSize; (* Calculate the free buffer space *)
+
+    fbBuffer.A_FreeHead(pBuffer  := ADR(buffer),
+                        cbBuffer := SIZEOF(buffer),
+                        bOk      => bOk,
+                        nCount   => nCount,
+                        cbSize   => cbSize,
+                        cbFree   => cbFree);
+
+    IF fbBuffer.bOk THEN
+        ; (* Success *)
+    ELSE
+        ; (* Buffer empty *)
+    END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Action>
+    <Property Name="Send" Id="{465b779d-cfd3-4a9d-a2a5-5ad1493f515f}">
+      <Declaration><![CDATA[PROPERTY Send : BOOL]]></Declaration>
+      <Get Name="Get" Id="{6a4a3eb9-6046-4572-9f72-fc0eb3a5194f}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Send := _Send;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{99b805fd-bdf0-4058-a6c9-ef7c380e9cae}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Send := Send;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

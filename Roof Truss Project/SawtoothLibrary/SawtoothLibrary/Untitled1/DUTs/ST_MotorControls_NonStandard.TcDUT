@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MotorControls_NonStandard" Id="{075762a0-ad86-43b1-9f22-ed1d456a4895}">
+    <Declaration><![CDATA[TYPE
+    ST_MotorControls_NonStandard : STRUCT
+        MotorCmd     : ARRAY[1..10] OF BOOL;
+        Temp_R_Trig : ARRAY[1..10] OF R_TRIG;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

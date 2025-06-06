@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_BoardLengthTest" Id="{cd0d92ab-dd2c-4665-978d-86951bf3490e}">
+    <Declaration><![CDATA[TYPE
+    ST_BoardLengthTest : STRUCT
+        LengthCalculated : ARRAY[1..10] OF LREAL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

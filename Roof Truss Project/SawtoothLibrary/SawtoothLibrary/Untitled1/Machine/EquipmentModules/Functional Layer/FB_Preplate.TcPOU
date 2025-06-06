@@ -1,0 +1,217 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Preplate" Id="{3c0837e3-3eb4-4bf7-b76e-a82175a8da80}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Preplate EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    // Component definitions here
+    Racks       : ARRAY[1..NUM_OF_PREPLATE_RACKS] OF FB_Component_Preplate_Rack;
+    ManDoorLock : FB_Component_Indicator;
+
+END_VAR
+
+VAR CONSTANT
+
+    // Report parameters 
+
+    //Alarms
+    NUM_OF_PREPLATE_RACKS : UDINT := 5;
+
+    PREPLATE_ALARM_COUNT : INT := 6;
+END_VAR
+
+VAR CONSTANT
+
+    SS_OPEN_DOORS  : INT := 200;
+    SS_CLOSE_DOORS : INT := 201;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{acd3fc5a-59ff-4d88-9f4e-dec8c5470c8e}" />
+    <Folder Name="Methods" Id="{4820bb97-fb47-43a9-9b4e-edab137d160b}">
+      <Folder Name="Acting States" Id="{f4e23bff-1ba7-4686-86bb-fcd8310dac81}" />
+      <Folder Name="CommandSteps" Id="{4c488095-6d75-4716-b581-8886e6fad8e9}" />
+      <Folder Name="Waiting States" Id="{83c0945a-a295-4e77-ace6-2524bfde8ec1}" />
+    </Folder>
+    <Folder Name="Properties" Id="{b7de276e-217d-4cda-bb2c-d768ad39a84b}" />
+    <Method Name="CyclicLogic" Id="{e91b0162-75a8-4ff3-b01c-5143f219c495}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR
+
+VAR
+    LowLimit  : STRING;
+    HighLimit : STRING;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+SUPER^.CyclicLogic();
+
+IF _CurrentState = E_PMLState.ePMLState_Execute OR
+   _CurrentState = E_PMLState.ePMLState_Unholding OR
+   _CurrentState = E_PMLState.ePMLState_Unsuspending THEN
+
+    ManDoorLock.TurnOn();
+ELSE
+    ManDoorLock.TurnOff();
+END_IF
+
+IF _CurrentState <> E_PMLState.ePMLState_Execute THEN
+    FOR i := 1 TO NUM_OF_PREPLATE_RACKS DO
+        Racks[i].Executing := FALSE;
+    END_FOR
+END_IF
+
+Racks[1].LinkBlocked := Racks[2].Blocked;
+Racks[2].LinkBlocked := Racks[1].Blocked;
+Racks[3].LinkBlocked := Racks[4].Blocked;
+Racks[4].LinkBlocked := Racks[3].Blocked OR Racks[4].Blocked;
+Racks[5].LinkBlocked := Racks[4].Blocked;
+;
+IF NOT Racks[1].IsAvailable() THEN
+	Racks[2].Disable();
+END_IF
+
+IF NOT Racks[2].IsAvailable() THEN
+	Racks[1].Disable();
+END_IF
+
+IF NOT Racks[3].IsAvailable() THEN
+	Racks[4].Disable();
+END_IF
+
+IF NOT Racks[4].IsAvailable() THEN
+	Racks[3].Disable();
+END_IF
+
+CyclicLogicSimulation();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Execute" Id="{3dee1be9-a264-48fa-b4ab-b85d159181a0}" FolderPath="Methods\Waiting States\">
+      <Declaration><![CDATA[(*! @summary This method contains code which will execute when this PackML module is in the <b>Execute</b> state*)
+METHOD PROTECTED Execute]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ManDoorLock.TurnOn();
+
+FOR i := 1 TO NUM_OF_PREPLATE_RACKS DO
+    Racks[i].Executing := TRUE;
+END_FOR]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{74341023-af67-4378-9127-e26f3d65def7}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="InAuto" Id="{ad38e53b-bff6-4fd2-a85f-9d81e54006f3}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC InAuto : BOOL]]></Declaration>
+      <Get Name="Get" Id="{74392c7a-0bb5-471b-bc7a-6e97ea5a7666}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{07b5e0d8-be88-4c83-b092-316b79763a85}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[FOR i := 1 TO NUM_OF_PREPLATE_RACKS DO
+    Racks[i].InAuto := InAuto;
+END_FOR]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Initialize" Id="{6798d530-e82c-4828-8a3a-4900ae48bc60}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        FOR i := 1 TO NUM_OF_PREPLATE_RACKS DO
+            RegisterComponent(Racks[i]);
+        END_FOR
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_TaskREF" Id="{d063c030-6b24-40b3-b574-c9d1dab21616}">
+    <Declaration><![CDATA[TYPE
+    ST_TaskREF : STRUCT
+        Task : REFERENCE TO ST_Task;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

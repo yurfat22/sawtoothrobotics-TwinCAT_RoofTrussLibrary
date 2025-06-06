@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_CSV" Id="{39ac5a85-0924-465b-9add-bc2064d3e42c}">
+    <Declaration><![CDATA[TYPE
+    ST_CSV : STRUCT
+        Steps : ARRAY[1..MAX_STEP_COUNT] OF ST_CSV_Step;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

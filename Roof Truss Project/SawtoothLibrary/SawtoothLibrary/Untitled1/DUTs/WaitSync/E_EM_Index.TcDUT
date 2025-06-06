@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_EM_Index" Id="{cca974a9-51ff-45d9-8e3b-986cb70f754d}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_EM_Index : (
+        EMPTY          := 0,
+        MBI_1          := 1,
+        MBI_2          := 2,
+        INFEED_1       := 3,
+        INFEED_2       := 4,
+        CARRIAGE_1     := 5,
+        CARRIAGE_2     := 6,
+        CARRIAGE_3     := 7,
+        HANDOFF_1      := 8,
+        HANDOFF_2      := 9,
+        HANDOFF_3      := 10,
+        HANDOFF_4      := 11,
+        PICK_1         := 12,
+        PICK_2         := 13,
+        PICK_3         := 14,
+        PICK_4         := 15,
+        PRESS          := 16,
+        PRESS_ROBOT    := 17,
+        PREPLATE_CELL  := 18,
+        PREPLATE_ROBOT := 19,
+        OUTFEED_ROBOT  := 20,
+        OUTFEED_JIG2   := 21,
+        OUTFEED_JIG3   := 22,
+        AMD_TASK       := 23,
+        INFEED_TASK    := 24,
+        PREPLATE_TASK  := 25,
+        PRESS_TASK     := 26,
+        TRANSPORTER    := 27,
+        SAMCOMMS       := 28,
+        MACHINE        := 29
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

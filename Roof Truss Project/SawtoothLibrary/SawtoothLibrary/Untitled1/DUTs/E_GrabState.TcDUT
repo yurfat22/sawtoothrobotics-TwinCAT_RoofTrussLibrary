@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_GrabState" Id="{59b4c089-f6d7-4ed4-a7dc-8c83fe036f31}">
+    <Declaration><![CDATA[{attribute 'strict'}
+{attribute 'to_string'}
+TYPE
+    E_GrabState : (
+        GRAB_START        := 0,
+        GRAB_MOVE_CHECK   := 10,
+        GRAB_TORQUE       := 20,
+        GRAB_FINISHED     := 40,
+        GRAB_VERIFY       := 50,
+        GRAB_RESUME_START := 60,
+        GRAB_ERROR        := 999
+    );
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

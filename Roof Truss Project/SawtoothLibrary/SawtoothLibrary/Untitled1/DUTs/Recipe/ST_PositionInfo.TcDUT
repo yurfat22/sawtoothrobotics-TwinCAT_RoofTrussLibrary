@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_PositionInfo" Id="{d11c9cb9-4566-4b14-a385-8827dbb85a0c}">
+    <Declaration><![CDATA[TYPE
+    ST_PositionInfo : STRUCT
+        Position     : REAL;
+        PositionType : INT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

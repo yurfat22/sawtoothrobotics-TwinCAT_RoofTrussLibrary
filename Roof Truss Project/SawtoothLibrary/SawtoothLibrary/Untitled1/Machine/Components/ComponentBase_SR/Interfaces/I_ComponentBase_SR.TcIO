@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_ComponentBase_SR" Id="{419a3803-847e-4542-9981-d24c68184140}">
+    <Declaration><![CDATA[INTERFACE I_ComponentBase_SR]]></Declaration>
+  </Itf>
+</TcPlcObject>

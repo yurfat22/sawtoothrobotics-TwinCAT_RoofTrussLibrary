@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_RFT" Id="{13f4fd18-6bd8-4269-9221-9a81d58623b0}">
+    <Declaration><![CDATA[TYPE
+    ST_RFT : STRUCT
+        MessageUuid      : STRING[40]; // UUID string
+        MessageCategory  : STRING[30]; // Adjust size as needed
+        InResponseToUuid : STRING[40]; // Needs special handling to serialize as null
+        TimeStamp        : STRING[12]; // Unsigned 64-bit integer for timestamp
+        LineNumber       : INT; // Assuming line numbers are small integers
+        StationName      : STRING[50]; // Adjust size as needed
+        SubStation       : STRING[50]; // Adjust size as needed
+        SubAsyncGroup    : STRING[50]; // Adjust size as needed
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

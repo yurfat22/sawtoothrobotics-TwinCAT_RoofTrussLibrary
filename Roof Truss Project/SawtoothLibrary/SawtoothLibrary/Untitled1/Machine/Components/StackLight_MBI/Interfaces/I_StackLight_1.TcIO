@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_StackLight_1" Id="{5e10ab32-d765-450b-a459-d1627f19852a}">
+    <Declaration><![CDATA[INTERFACE I_StackLight_1]]></Declaration>
+    <Property Name="MyInput" Id="{92b68c4e-e8a3-4d62-b91c-f7c40800d1b3}">
+      <Declaration><![CDATA[PROPERTY MyInput : BOOL]]></Declaration>
+      <Get Name="Get" Id="{c0a24b52-5905-4ed3-8921-293678988eb7}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{fb22be43-898c-4a98-b3c0-caa7fc542542}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="MyOutput" Id="{830c2886-3bec-41c3-920a-e8a2fdb7e4d1}">
+      <Declaration><![CDATA[PROPERTY MyOutput : E_PMLState]]></Declaration>
+      <Get Name="Get" Id="{45605781-491b-48a9-afc1-2e29894701af}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{c8f83b8d-b100-4431-84f6-7bee2896e413}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+  </Itf>
+</TcPlcObject>

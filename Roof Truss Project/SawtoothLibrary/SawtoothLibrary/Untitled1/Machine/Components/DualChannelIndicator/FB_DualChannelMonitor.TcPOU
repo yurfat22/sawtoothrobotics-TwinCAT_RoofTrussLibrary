@@ -1,0 +1,100 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_DualChannelMonitor" Id="{d32d400d-2733-45c0-8d66-f4955ed21a47}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DualChannelMonitor EXTENDS FB_ComponentBase_SR
+VAR
+    CH_1 : FB_DigitalSensor := (Name := 'Channel_1'); // Auto mode key switch
+    CH_2 : FB_DigitalSensor := (Name := 'Channel_1'); // Manual mode forward
+    LED  : FB_Component_Indicator := (Name := 'LED'); // LED if available
+	SIM_ResetChannels: BOOL;
+	
+	Sim_Reset_R_TRIG : R_TRIG;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{f03d3fce-96eb-4c09-ac8e-275ace74179c}" />
+    <Folder Name="Methods" Id="{f2ec6ba3-d5d0-4053-8d2a-e64d63a59a0b}" />
+    <Folder Name="Properties" Id="{de880e26-bb2d-4c17-b98a-7c7308bf3af4}" />
+    <Property Name="BothChannelsOK" Id="{973a2203-71da-4d34-822d-697bbbb0ada5}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY BothChannelsOK : BOOL]]></Declaration>
+      <Get Name="Get" Id="{072976e1-06a7-4ed5-a035-b1630b2a2245}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[BothChannelsOK := CH_1.Active AND CH_2.Active;
+]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="CreateEvents" Id="{d675dd27-01ab-4bd9-9d25-822eda76d72d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{aef31f36-1248-4948-87db-6832f8122fe0}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+//Custom Component Logic goes here
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := Comp_Alarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+CH_1.CyclicLogic();
+CH_2.CyclicLogic();
+
+CH_1.InSimulation := _Simulate;
+CH_2.InSimulation := _Simulate;
+
+Sim_Reset_R_TRIG(CLK := _Simulate);
+IF Sim_Reset_R_TRIG.Q THEN
+	SIM_ResetChannels := TRUE;
+END_IF
+
+IF SIM_ResetChannels THEN
+    CH_1.SimulationInput := TRUE;
+    CH_2.SimulationInput := TRUE;
+ELSE
+    CH_1.SimulationInput := FALSE;
+    CH_2.SimulationInput := FALSE;
+END_IF
+
+LED.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{7e8b83eb-c2da-403d-9ced-fb98c487363b}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

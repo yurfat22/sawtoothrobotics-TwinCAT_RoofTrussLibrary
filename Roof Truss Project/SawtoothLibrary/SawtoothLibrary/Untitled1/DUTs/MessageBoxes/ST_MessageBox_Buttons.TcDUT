@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_MessageBox_Buttons" Id="{6e9466a0-6e10-44f9-a9a1-ac0e3bc0c4fb}">
+    <Declaration><![CDATA[TYPE
+    ST_MessageBox_Buttons : STRUCT
+        Button1 : ST_MessageBox_Button;
+        Button2 : ST_MessageBox_Button;
+        Button3 : ST_MessageBox_Button;
+        Button4 : ST_MessageBox_Button;
+        Button5 : ST_MessageBox_Button;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

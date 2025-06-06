@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_IRC5_Input" Id="{2862d086-5ca4-4b06-a22f-cf53376ef4a8}">
+    <Declaration><![CDATA[TYPE
+    ST_IRC5_Input : STRUCT
+        AutoMode          : BOOL;
+        E_Stop            : BOOL;
+        MotionSupervision : BOOL;
+        MotorsOn          : BOOL;
+        SignalsSimulated  : BOOL;
+        AllTasksRunning   : BOOL;
+        RunChainOK        : BOOL;
+        PP_Moved          : BOOL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

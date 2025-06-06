@@ -1,0 +1,226 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_Preplate_Rack" Id="{140dffbd-304d-4719-a3a1-216bf5831242}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_Preplate_Rack EXTENDS FB_ComponentBase_SR
+VAR_INPUT
+    Executing : BOOL;
+
+END_VAR
+
+VAR
+    // Inputs
+
+    Button  : FB_Component_Button;
+    Closed  : FB_DigitalSensor;
+    _InAuto : BOOL;
+
+    // Outputs
+    Lock : FB_Component_Indicator;
+END_VAR
+
+VAR
+    State    : E_RackState;
+    R_Button : R_TRIG;
+
+    //Properties
+    _Available   : BOOL;
+    _LinkBlocked : BOOL;
+    _Blocked     : BOOL;
+    Linked       : BOOL := TRUE;
+
+    // Alarms
+    RackDoorAlarms : ARRAY[1..RACK_DOOR_ALARMS_COUNT] OF FB_TcAlarm;
+
+END_VAR
+
+VAR
+    // Internal state variables
+    DoorLocked : BOOL := FALSE;
+END_VAR
+
+VAR CONSTANT
+    RACK_DOOR_ALARMS_COUNT : UDINT := 5;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{e37cfa7c-4528-49df-94c9-fc5af6ad140f}" />
+    <Folder Name="I_CyclicFB" Id="{5d76e6b8-cac5-44aa-8843-44cf313556b4}" />
+    <Folder Name="I_PreplateRack" Id="{7ffd7deb-cd66-4056-aeef-03665cc0122b}" />
+    <Folder Name="Methods" Id="{45e321d8-a239-4eb3-b176-b7f97ea5e0a3}" />
+    <Folder Name="Properties" Id="{00069080-63ce-4a2e-9cae-f91960191816}" />
+    <Method Name="Block" Id="{b66f7522-8d97-4258-9335-a16039e4e516}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Block
+VAR_INPUT
+    Blocked : BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_Blocked := Blocked;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Blocked" Id="{44e86bb0-6511-4bb7-ac3a-2a855d3a0939}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Blocked : BOOL]]></Declaration>
+      <Get Name="Get" Id="{b6bd32aa-f21d-4ad1-8266-efc9edf33d40}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Blocked := _Blocked;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{7ff5a8fe-2e0e-41db-af02-88a27a95b2f3}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Blocked := Blocked;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="CyclicLogic" Id="{fc886497-fd76-4210-ba29-1a53642dfd16}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[RackLogic();
+
+Button.CyclicLogic();
+Closed.CyclicLogic();
+Lock.CyclicLogic();
+
+SUPER^.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Disable" Id="{8fb7f0b3-5bce-47f2-9692-287f90893fa5}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Disable
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[_Available := FALSE;
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="InAuto" Id="{556d3f89-434a-427f-b06a-2bfcff699a20}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY PUBLIC InAuto : BOOL]]></Declaration>
+      <Set Name="Set" Id="{431e2ce9-73a7-4e77-a65d-c6ab2a1d6767}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_InAuto := InAuto;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Initialize" Id="{688196a4-7727-47f2-8b56-8dd6ead9680e}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IsAvailable" Id="{274b1aa5-92ae-4425-b753-a97cd92313ef}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD IsAvailable : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IsAvailable := _Available;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="LinkBlocked" Id="{8c3827e8-725b-4c24-ac55-488da1da9138}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY LinkBlocked : BOOL]]></Declaration>
+      <Get Name="Get" Id="{85b43550-5b1c-4b82-99f1-67303e77afae}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[LinkBlocked := _LinkBlocked;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{9236ab0f-421b-41df-8e96-a5403df0bb6e}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_LinkBlocked := LinkBlocked;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="RackLogic" Id="{3126a4e4-285a-455c-8625-38aebb4fdea2}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD RackLogic
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[R_Button(CLK := (Button.Button.Active));
+
+CASE State OF
+    E_RackState.Idle:
+        Button.LED.TurnOn();
+        Lock.TurnOn();
+        _Available := TRUE;
+        IF R_Button.Q THEN
+            State := E_RackState.CheckForBlock;
+        END_IF;
+
+    E_RackState.CheckForBlock:
+        Button.LED.Flash();
+        Lock.TurnOn();
+        IF NOT Blocked THEN
+            State := E_RackState.CheckForLinked;
+        ELSIF R_Button.Q THEN
+            State := E_RackState.LockDoor;
+        END_IF;
+
+    E_RackState.CheckForLinked:
+        Button.LED.Flash();
+        IF NOT LinkBlocked THEN
+            State := E_RackState.UnlockDoor;
+        END_IF;
+
+        IF NOT Linked THEN
+            State := E_RackState.UnlockDoor;
+        ELSIF R_Button.Q THEN
+            State := E_RackState.LockDoor;
+        END_IF;
+
+    E_RackState.UnlockDoor:
+        Lock.TurnOff();
+        Button.LED.Flash();
+        _Available := FALSE;
+        State      := E_RackState.WaitForOpen;
+
+    E_RackState.WaitForOpen:
+        Button.LED.TurnOff();
+        IF NOT Closed.Active THEN
+            State := E_RackState.WaitForClose;
+        END_IF;
+
+    E_RackState.WaitForClose:
+        Button.LED.TurnOff();
+        IF Closed.Active THEN
+            State := E_RackState.LockDoor;
+        END_IF;
+
+    E_RackState.LockDoor:
+        Lock.TurnOn();
+        Button.LED.Flash();
+        State := E_RackState.EnableDoor;
+
+    E_RackState.EnableDoor:
+        Lock.TurnOn();
+        _Available := TRUE;
+        State      := E_RackState.Idle;
+END_CASE;
+
+IF NOT Executing THEN
+    Lock.TurnOff();
+
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

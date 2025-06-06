@@ -1,0 +1,1200 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_SamComm" Id="{00b98f6f-eb95-46f4-98b4-a7dd3191fe3f}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_SamComm EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    ipSubModules_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_PackML_BaseModule := [];
+
+    // Component definitions here
+
+    // List of Components
+
+    ipComponents_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_COMPONENTS] OF I_ComponentBase := [];
+
+    Line1Empty                : BOOL := FALSE;
+    Line2Empty                : BOOL := FALSE;
+    InfeedAlternateLine       : BOOL := FALSE;
+    InfeedPreviousLineRequest : INT;
+END_VAR
+
+VAR
+    sSrvNetID : T_AmsNetID := ''; (* TwinCAT TCP/IP server network address *)
+    bEnable   : BOOL       := TRUE; (* TRUE => enable client data exchange, FALSE => disable *)
+    bLog      : BOOL       := FALSE; (* TRUE => Enable message/error log, FALSE => Disable *)
+
+    fbCloseAll  : FB_SocketCloseAll;
+    bInitialize : BOOL := TRUE;
+
+    _Tasks : ARRAY[1..MAX_TASKS] OF ST_TaskREF;
+
+    _OutfeedConveyorStatus_Jig2 : ST_OutfeedConveyorStatus;
+    _OutfeedConveyorStatus_Jig3 : ST_OutfeedConveyorStatus;
+
+END_VAR
+
+(* Connection parameters *)
+
+VAR CONSTANT
+    //     SERVER_IP : STRING := '192.168.10.100'; (* IP address of the SAM server local at Sawtooth *)
+    SERVER_IP   : STRING := '192.168.10.52'; (* IP address of the SAM server *)
+    SERVER_PORT : UINT   := 3006; (* Port for SAM server *)
+END_VAR
+
+VAR
+    eState       : E_SocketConnectionState := eSOCKET_DISCONNECTED; (* TCP/IP connection state *)
+    sPrefix      : STRING                  := 'CLIENT::'; (* Log message description string (allows the identification of log message source) *)
+    fbConnection : FB_ClientConnection; (* Client data exchange control function block *)
+    fbTx         : FB_FrameFifo; (* Tx fifo *)
+    fbRx         : FB_FrameFifo; (* Rx fifo *)
+    fbLog        : FB_LogFifo; (* Log/debug/error fifo *)
+
+    eStateMachine : E_SAMCommStateMachine := E_SAMCommStateMachine.CREATE_RFI; (* State machine *)
+    eStateMachine_PreviousState : E_SAMCommStateMachine; (* State machine *)
+    sToServer        : STRING[25000];
+    sFromServer      : STRING[25000];
+    fbSndTimer       : TON;
+    RFT_Index        : INT         := 1;
+    sLogMessage      : T_MaxString := '';
+    InfeedLineNumber : INT;
+
+    UseLineOneOnly : BOOL := FALSE;
+
+	CurrentMessageUID : STRING[40];
+	CurrentMessageCategory : STRING[20];
+	
+END_VAR
+
+VAR CONSTANT
+    PROTOCOL_VERSION     : STRING := 'TRUS.0.1';
+    MESSAGE_START        : STRING := 'startOfPacket<<<';
+    MESSAGE_END          : STRING := '>>>endOfPacket__';
+    HEADER_SPACES        : STRING := '  ';
+    MESSAGE_START_LEN    : INT    := 16;
+    PROTOCOL_VERSION_OFS : INT    := MESSAGE_START_LEN;
+    PROTOCOL_VERSION_LEN : INT    := 8;
+    CONTENT_TYPE_OFS     : INT    := PROTOCOL_VERSION_OFS + PROTOCOL_VERSION_LEN;
+    CONTENT_TYPE_LEN     : INT    := 8;
+    SPACES_ONE_OFS       : INT    := CONTENT_TYPE_OFS + CONTENT_TYPE_LEN;
+    SPACES_ONE_LEN       : INT    := 2;
+    DATA_LEN_OFS         : INT    := SPACES_ONE_OFS + SPACES_ONE_LEN;
+    DATA_LEN_LEN         : INT    := 12;
+    SPACES_TWO_OFS       : INT    := DATA_LEN_OFS + DATA_LEN_LEN;
+    SPACES_TWO_LEN       : INT    := 2;
+    DATA_OFS             : INT    := SPACES_TWO_OFS + SPACES_TWO_LEN;
+    MESSAGE_END_LEN      : UDINT  := 16;
+    MESSAGE_HEADER_SIZE  : UDINT  := 48;
+    MESSAGE_SIZE_MIN     : INT    := 64;
+    MESSAGE_DATA_MAX     : UDINT  := (PLCPRJ_BUFFER_SIZE - (MESSAGE_HEADER_SIZE + MESSAGE_END_LEN));
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{894a548b-cde6-45a8-bfb7-a283eaa63432}" />
+    <Folder Name="Methods" Id="{af090cf3-7b7c-4df0-8115-d94ed2a091f1}">
+      <Folder Name="AppMethods" Id="{78ae1b27-ab04-4fcb-bbdd-caf851155c29}" />
+    </Folder>
+    <Folder Name="Properties" Id="{2261090c-0b06-417c-a718-276e17697028}" />
+    <Method Name="Application" Id="{8e2e2267-6210-4e64-9045-5ba1c7ef3d59}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD Application : E_SocketConnectionState
+VAR_INPUT
+    sSrvNetID   : T_AmsNetID := ''; (* TwinCAT TCP/IP server network address *)
+    sRemoteHost : T_IPv4Addr := '127.0.0.1'; (* IP address of remote server *)
+    nRemotePort : UDINT      := 200; (* Remote server port *)
+    bEnable     : BOOL       := FALSE; (* TRUE => Enable/connect, FALSE => Disable/disconnect *)
+    tReconnect  : TIME       := T#45s; (* Try to reconnect after this time *)
+    bLog        : BOOL       := FALSE; (* TRUE => Enable log message output, FALSE => Disable *)
+    sPrefix     : STRING     := 'CLIENT::'; (* Log message description string (allows the identification of log message source) *)
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// State machine logic
+CASE eStateMachine OF
+
+    E_SAMCommStateMachine.CREATE_RFI:
+        (* Create RequestForInfo message *)
+        sToServer     := ComposeRequestForInfo();
+        eStateMachine := E_SAMCommStateMachine.SEND_RFI;
+        fbLog.Error(sMessage := 'Request for info from CREATE_RFI');
+        Trace(CONCAT('Request for info from CREATE_RFI: Task # -> ', INT_TO_STRING(RFT_Index)));
+        fbSndTimer(IN := FALSE);
+
+    E_SAMCommStateMachine.SEND_RFI:
+        (* Send RequestForInfo message *)
+        fbSndTimer(IN := FALSE);
+        fbTx.AddTail(putObj := sToServer); (* Put string to the tx fifo *)
+
+        IF fbTx.bOk THEN
+            eStateMachine := E_SAMCommStateMachine.PROCESS_REPLY;
+            Trace(CONCAT('fbTx.bOk from SEND_RFI: Task # -> ', INT_TO_STRING(RFT_Index)));
+        ELSE
+            fbLog.Error(sMessage := 'FB_FrameFifo(senderhere)', nErrID := PLCPRJ_ERROR_SENDFIFO_OVERFLOW);
+            Trace(CONCAT('fbTx.bOk = FALSE from SEND_RFI: Task # -> ', INT_TO_STRING(RFT_Index)));
+            eStateMachine := E_SAMCommStateMachine.WATCH_EVENTS;
+        END_IF
+
+    E_SAMCommStateMachine.PROCESS_REPLY:
+        (* Monitor incoming data and handle responses *)
+        fbRx.RemoveHead(); (* Fetch string from rx fifo *)
+        fbSndTimer(IN := TRUE, PT := T#15s);
+
+        IF fbRx.bOk THEN (* Success *)
+            sFromServer := fbRx.getObj;
+
+            IF ProcessReceivedMessage(sFromServer) THEN
+                eStateMachine := E_SAMCommStateMachine.WATCH_EVENTS;
+                fbSndTimer(IN := FALSE);
+                Trace(CONCAT('Message Confirmed: Task # -> ', INT_TO_STRING(RFT_Index)));
+            ELSE
+                IF CurrentMessageCategory = 'RequestForTask' THEN
+                    eStateMachine := E_SAMCommStateMachine.CREATE_RFT;
+                    Trace(CONCAT('resending RFT: Task # -> ', INT_TO_STRING(RFT_Index)));
+                ELSE
+                    eStateMachine := E_SAMCommStateMachine.CREATE_STATUS;
+                    Trace(CONCAT('resending Status: Task # -> ', INT_TO_STRING(RFT_Index)));
+                END_IF
+            END_IF
+        ELSIF fbSndTimer.Q THEN
+            fbSndTimer(IN := FALSE);
+            Trace(CONCAT('PROCESS_REPLY timed out: Task # -> ', INT_TO_STRING(RFT_Index)));
+            eStateMachine := E_SAMCommStateMachine.WATCH_EVENTS;
+        END_IF
+
+    E_SAMCommStateMachine.WATCH_EVENTS:
+
+        fbSndTimer(IN := TRUE, PT := PLCPRJ_CLIENT_SEND_CYCLE_TIME);
+
+        IF RFT_Index = 1 THEN
+            IF _Tasks[RFT_Index].Task.Info.State = E_TaskState.COMPLETE OR
+               _Tasks[RFT_Index].Task.Info.State = E_TaskState.ABORT_RETRY OR
+               _Tasks[RFT_Index].Task.Info.State = E_TaskState.ABORT THEN
+// 			   _Tasks[RFT_Index].Task.Info.State := E_TaskState.IDLE;
+                InfeedAlternateLine := FALSE;
+            END_IF
+        END_IF
+
+        IF fbSndTimer.Q OR CheckForStatusUpdate(RFT_Index) THEN
+
+            fbSndTimer(IN := FALSE);
+            eStateMachine := E_SAMCommStateMachine.CREATE_STATUS;
+            Trace(CONCAT('fbSndTimer.Q OR CheckForStatusUpdate(RFT_Index) from WATCH_EVENTS: Task # -> ', INT_TO_STRING(RFT_Index)));
+        ELSIF CheckForRFT(RFT_Task := RFT_Index) THEN
+            Trace(CONCAT('CheckForRFT(RFT_Task := RFT_Index) = TRUE from WATCH_EVENTS: Task # -> ', INT_TO_STRING(RFT_Index)));
+            eStateMachine := E_SAMCommStateMachine.CREATE_RFT;
+            fbSndTimer(IN := FALSE);
+        END_IF
+
+    E_SAMCommStateMachine.CREATE_STATUS:
+
+        (* Create RequestForInfo message *)
+        sToServer     := ComposeStatus();
+        eStateMachine := E_SAMCommStateMachine.SEND_STATUS;
+        fbLog.Error(sMessage := 'status created from CREATE_STATUS');
+        Trace(CONCAT('status created from CREATE_STATUS: Task # -> ', INT_TO_STRING(RFT_Index)));
+        fbSndTimer(IN := FALSE);
+
+    E_SAMCommStateMachine.SEND_STATUS:
+
+        (* Send Status message *)
+        fbTx.AddTail(putObj := sToServer); (* Put string to the tx fifo *)
+        fbSndTimer(IN := FALSE);
+
+        IF fbTx.bOk THEN
+            eStateMachine := E_SAMCommStateMachine.PROCESS_REPLY;
+            Trace(CONCAT('fbTx.bOk from SEND_STATUS: Task # -> ', INT_TO_STRING(RFT_Index)));
+        ELSE
+            fbLog.Error(sMessage := 'FB_FrameFifo(senderhere)', nErrID := PLCPRJ_ERROR_SENDFIFO_OVERFLOW);
+            eStateMachine := E_SAMCommStateMachine.WATCH_EVENTS;
+            Trace(CONCAT('fbTx.bOk = FALSE from SEND_STATUS: Task # -> ', INT_TO_STRING(RFT_Index)));
+        END_IF
+
+    E_SAMCommStateMachine.CREATE_RFT:
+
+        (* Create RequestForTask message *)
+
+        IF RFT_Index = 1 THEN
+            _Tasks[RFT_Index].Task.Info.LineNumber :=
+                InfeedLineNumberCheck(Alternate := InfeedAlternateLine, PreviousLine := InfeedPreviousLineRequest);
+            //             _Tasks[RFT_Index].Task.Info.LineNumber := 1;
+            sToServer                              := ComposeRFT(index := RFT_Index);
+        ELSE
+            _Tasks[RFT_Index].Task.Info.LineNumber := _Tasks[RFT_Index - 1].Task.Info.LineNumber;
+            sToServer                              := ComposeRFT(index := RFT_Index);
+        END_IF
+
+        //         IF _Tasks[RFT_Index].Task.Info.CurrentTaskStep < _Tasks[RFT_Index].Task.Info.TotalTaskSteps AND
+        //            _Tasks[RFT_Index].Task.Info.State <> E_TaskState.ABORT AND
+        //            _Tasks[RFT_Index].Task.Info.State <> E_TaskState.ABORT_RETRY THEN
+        //             eStateMachine := E_SAMCommStateMachine.DEBUG;
+        //             Trace(CONCAT('DEBUG state from SEND_STATUS: Task # -> ', INT_TO_STRING(RFT_Index)));
+        //         ELSE
+        //             eStateMachine := E_SAMCommStateMachine.SEND_RFT;
+        //             Trace(CONCAT('RFT created from SEND_STATUS: Task # -> ', INT_TO_STRING(RFT_Index)));
+        //         END_IF
+
+        eStateMachine := E_SAMCommStateMachine.SEND_RFT;
+        Trace(CONCAT('RFT created: Task # -> ', INT_TO_STRING(RFT_Index)));
+        Trace(CONCAT('RFT created: Line number -> ', INT_TO_STRING(_Tasks[RFT_Index].Task.Info.LineNumber)));
+
+        fbSndTimer(IN := FALSE);
+
+    E_SAMCommStateMachine.SEND_RFT:
+
+        (* Send Status message *)
+        fbTx.AddTail(putObj := sToServer); (* Put string to the tx fifo *)
+        fbSndTimer(IN := FALSE);
+
+        IF fbTx.bOk THEN
+            eStateMachine := E_SAMCommStateMachine.PROCESS_REPLY;
+            fbLog.Error(sMessage := 'fbTx.bOk from SEND_RFT');
+            Trace(CONCAT('fbTx.bOk from SEND_RFT: Task # -> ', INT_TO_STRING(RFT_Index)));
+        ELSE
+            fbLog.Error(sMessage := 'FB_FrameFifo(senderhere)', nErrID := PLCPRJ_ERROR_SENDFIFO_OVERFLOW);
+            eStateMachine := E_SAMCommStateMachine.WATCH_EVENTS;
+            Trace(CONCAT('fbTx.bOk = FALSE from SEND_RFT: Task # -> ', INT_TO_STRING(RFT_Index)));
+        END_IF
+
+END_CASE
+
+IF eStateMachine_PreviousState <> eStateMachine THEN
+    //     fbLog.Error(sMessage := CONCAT('State change: ', TO_STRING(eStateMachine)));
+END_IF
+
+eStateMachine_PreviousState := eStateMachine;
+
+(*------------------------------- Send cyclic message strings ------------------------------------------*)
+
+// (*------------------------------- Get received message strings ------------------------------------------*)
+// REPEAT
+//     fbRx.RemoveHead(); (* Fetch string from rx fifo *)
+// 
+//     IF fbRx.bOk THEN (* Success *)
+// 
+//         (* TODO: Implement receive data handler *)
+//         sFromServer := fbRx.getObj;
+// 
+//     END_IF
+// UNTIL NOT fbRx.bOk
+// END_REPEAT
+
+(*------------------------------- Get log/error messages from log fifo ------------------------------------------*)
+REPEAT
+    fbLog.Remove();
+
+    IF fbLog.bOk THEN
+
+        (* TODO: Implement log message handler *)
+        sLogMessage := fbLog.sGet;
+
+    END_IF
+UNTIL NOT fbLog.bOk
+END_REPEAT]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CheckForRFT" Id="{3c0736b2-439f-4dcb-baf9-650550fa3250}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD CheckForRFT : BOOL
+VAR_INPUT
+END_VAR
+
+VAR_IN_OUT
+    RFT_Task : INT; // Equivalent of Task *out_task
+END_VAR
+
+VAR
+    i : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// FOR i := 1 TO MAX_TASKS DO
+//     IF _Tasks[i].Task.RFT_Requested THEN
+//         RFT_Task    := i;
+//         CheckForRFT := TRUE;
+//         RETURN;
+//     END_IF
+// END_FOR
+
+FOR i := RFT_Task TO MAX_TASKS DO
+
+    IF _Tasks[i].Task.Info.State <> E_TaskState.INVALID AND _Tasks[i].Task.Info.Active THEN
+        IF i > 1 THEN
+            IF NOT IsIdleTask(_Tasks[i - 1].Task.Info.State) AND _Tasks[i - 1].Task.Info.CurrentTaskId <> _Tasks[i].Task.Info.CurrentTaskId THEN
+                IF IsIdleTask(_Tasks[i].Task.Info.State) THEN
+                    fbLog.Message(sMessage := 'Task is idle or completed. Will send RFT after next status...');
+                    RFT_Task                     := i; // Update out_task
+                    CheckForRFT                  := TRUE;
+                    _Tasks[i].Task.RFT_Requested := TRUE;
+                    Trace(CONCAT('Task is idle or completed. Will send RFT after next status...: Task # -> ', INT_TO_STRING(RFT_Index)));
+                    RETURN;
+                END_IF;
+            END_IF
+        ELSIF i = 1 THEN
+            IF IsIdleTask(_Tasks[i].Task.Info.State) THEN
+                fbLog.Message(sMessage := 'Task is idle or completed. Will send RFT after next status...');
+                RFT_Task                     := i; // Update out_task
+                CheckForRFT                  := TRUE;
+                _Tasks[i].Task.RFT_Requested := TRUE;
+                Trace(CONCAT('Task is idle or completed. Will send RFT after next status...: Task # -> ', INT_TO_STRING(RFT_Index)));
+                RETURN;
+            END_IF;
+        END_IF
+    END_IF;
+END_FOR;
+
+RFT_Task    := 1;
+CheckForRFT := FALSE;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CheckForStatusUpdate" Id="{90dc8732-0974-4847-8262-c02c08a4e8fb}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD CheckForStatusUpdate : BOOL
+VAR_INPUT
+END_VAR
+
+VAR_IN_OUT
+    RFT_Task : INT; // Equivalent of Task *out_task
+END_VAR
+
+VAR
+    i : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CheckForStatusUpdate := FALSE;
+FOR i := RFT_Task TO MAX_TASKS DO
+    IF _Tasks[i].Task.Info.State <> E_TaskState.INVALID THEN
+        IF _Tasks[i].Task.StatusUpdate THEN
+            CheckForStatusUpdate := TRUE;
+            EXIT;
+        END_IF;
+    END_IF;
+END_FOR;
+
+FOR i := RFT_Task TO MAX_TASKS DO
+    IF CheckForStatusUpdate THEN
+        fbLog.Message(sMessage := 'Task has marked status needed, Will send Status before RFT...');
+        Trace(CONCAT('Task has marked status needed, Will send Status before RFT...: Task # -> ', INT_TO_STRING(RFT_Index)));
+        _Tasks[i].Task.StatusUpdate := FALSE;
+    END_IF;
+END_FOR;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ComposeRequestForInfo" Id="{b60ce647-61f4-4af8-841f-66b76549a510}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD ComposeRequestForInfo : STRING[1000]
+VAR_INPUT
+END_VAR
+
+VAR
+    sPayload          : STRING[1000];
+    sTempPayload      : STRING[255];
+    sTempPayload2     : STRING[255];
+    nPayloadLength    : UDINT;
+    nLENofPayloadSize : INT;
+    sLENofPayloadSize : STRING(36);
+    sRequestMessage   : STRING[1000];
+    uuid_str          : STRING(36);
+    fbTime            : FB_LocalSystemTime := (bEnable := TRUE);
+    currentDateTime   : DATE_AND_TIME;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(* Compose the JSON payload using CONCAT2 *)
+fbTime(bEnable := TRUE, dwCycle := 1);
+currentDateTime := SYSTEMTIME_TO_DT(fbTime.systemTime);
+
+sPayload := '';
+
+sTempPayload := '{"MessageUuid":"';
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+sTempPayload := GenUUID();
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+sTempPayload := '","MessageCategory":"RequestForInfo",';
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+sTempPayload := '"InResponseToUuid":null,';
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+sTempPayload := '"TimeStamp":';
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+sTempPayload := DINT_TO_STRING(DT_TO_DINT(currentDateTime));
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+sTempPayload := ',"DeviceInfo":{"Name":"AMD PLC","Model":"Beckhoff PLC","Serial":"1234-ABC-12","OSVersion":"9.46","SoftwareVersion":"0.0.1","SoftwareSHA":"abc1234","LogPort":9090,"SecondsSinceBoot":';
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+sTempPayload := DWORD_TO_STRING(TIME_TO_DWORD(TIME()));
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+sTempPayload := '}}';
+CONCAT2(ADR(sPayload), ADR(sTempPayload), ADR(sPayload), SIZEOF(sPayload));
+
+nPayloadLength    := LEN2(ADR(sPayload));
+nLENofPayloadSize := LEN(UDINT_TO_STRING(nPayloadLength));
+sLENofPayloadSize := UDINT_TO_STRING(nPayloadLength);
+
+(* Construct the full message with headers and footers using CONCAT2 *)
+sRequestMessage := '';
+CONCAT2(ADR(sRequestMessage), ADR(MESSAGE_START), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+CONCAT2(ADR(sRequestMessage), ADR(PROTOCOL_VERSION), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := '    JSON  ';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := REPLACE('000000000000', sLENofPayloadSize, nLENofPayloadSize, 13 - nLENofPayloadSize);
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := '  ';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+//Add Payload in
+CONCAT2(ADR(sRequestMessage), ADR(sPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := '>>>endOfPacket__';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+
+ComposeRequestForInfo := sRequestMessage;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ComposeRFT" Id="{a4c96664-1efc-4d88-a70b-76801f692922}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD ComposeRFT : STRING[25000]
+VAR_INPUT
+    index : INT;
+END_VAR
+
+VAR
+    // Function block instances
+    fbJson         : FB_JsonSaxWriter;
+    fbJsonDataType : FB_JsonReadWriteDataType;
+    fbTime         : FB_LocalSystemTime; // Assuming you have this function block for time
+
+    // Variables
+    currentDateTime   : DATE_AND_TIME;
+    sPayload          : STRING(5000); // Adjust size as needed
+    nPayloadLength    : UDINT;
+    nLENofPayloadSize : INT;
+    sLENofPayloadSize : STRING(10);
+    sRequestMessage   : STRING(5000); // Adjust size as needed
+    sTempPayload      : STRING(100);
+
+    // Constants (Assuming these are defined somewhere)
+    MESSAGE_START    : STRING := 'startOfPacket<<<';
+    PROTOCOL_VERSION : STRING := 'TRUS.0.1    ';
+    MESSAGE_END      : STRING := '>>>endOfPacket__';
+
+    // Your StatusMessage structure
+    RFTMessage : ST_RFT; // Assuming Message_Type is your structure
+    i          : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//Getting the Current Timestamp
+fbTime(bEnable := TRUE, dwCycle := 1);
+currentDateTime := SYSTEMTIME_TO_DT(fbTime.systemTime);
+
+// Assign values to the root fields
+RFTMessage.MessageUuid      := GenUUID();
+RFTMessage.MessageCategory  := 'RequestForTask';
+CurrentMessageUID := RFTMessage.MessageUuid;
+CurrentMessageCategory := RFTMessage.MessageCategory;
+RFTMessage.InResponseToUuid := ''; // We'll handle serialization as null
+RFTMessage.TimeStamp        := DINT_TO_STRING(DT_TO_DINT(currentDateTime));
+RFTMessage.LineNumber       := _tasks[index].Task.Info.LineNumber;
+RFTMessage.StationName      := _tasks[index].Task.Info.StationName;
+RFTMessage.SubStation       := _tasks[index].Task.Info.SubStation;
+//RFTMessage.SubAsyncGroup := tasks[index].SubAsyncGroup;
+
+// Build the JSON payload
+fbJson.ResetDocument();
+fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'ST_RFT', SIZEOF(RFTMessage), ADR(RFTMessage));
+
+// Copy the JSON document into sPayload
+fbJson.CopyDocument(sPayload, SIZEOF(sPayload));
+
+nPayloadLength    := LEN2(ADR(sPayload));
+nLENofPayloadSize := LEN(UDINT_TO_STRING(nPayloadLength));
+sLENofPayloadSize := UDINT_TO_STRING(nPayloadLength);
+
+(* Construct the full message with headers and footers using CONCAT2 *)
+sRequestMessage := '';
+CONCAT2(ADR(sRequestMessage), ADR(MESSAGE_START), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+CONCAT2(ADR(sRequestMessage), ADR(PROTOCOL_VERSION), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := 'JSON  ';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := REPLACE('000000000000', sLENofPayloadSize, nLENofPayloadSize, 13 - nLENofPayloadSize);
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := '  ';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+//Add Payload in
+CONCAT2(ADR(sRequestMessage), ADR(sPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := '>>>endOfPacket__';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+
+ComposeRFT := sRequestMessage;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ComposeStatus" Id="{86ac6538-30a2-409f-bc38-16fd40304b40}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD ComposeStatus : STRING[25000]
+VAR_INPUT
+END_VAR
+
+VAR
+    // Function block instances
+    fbJson         : FB_JsonSaxWriter;
+    fbJsonDataType : FB_JsonReadWriteDataType;
+    fbTime         : FB_LocalSystemTime; // Assuming you have this function block for time
+
+    // Variables
+    currentDateTime   : DATE_AND_TIME;
+    sPayload          : STRING(5000); // Adjust size as needed
+    nPayloadLength    : UDINT;
+    nLENofPayloadSize : INT;
+    sLENofPayloadSize : STRING(10);
+    sRequestMessage   : STRING(5000); // Adjust size as needed
+    sTempPayload      : STRING(100);
+
+    // Constants (Assuming these are defined somewhere)
+    MESSAGE_START    : STRING := 'startOfPacket<<<';
+    PROTOCOL_VERSION : STRING := 'TRUS.0.1    ';
+    MESSAGE_END      : STRING := '>>>endOfPacket__';
+
+    // Your StatusMessage structure
+    StatusMessage : ST_Messages; // Assuming Message_Type is your structure
+    i             : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//Getting the Current Timestamp
+fbTime(bEnable := TRUE, dwCycle := 1);
+currentDateTime := SYSTEMTIME_TO_DT(fbTime.systemTime);
+
+// Assign values to the root fields
+StatusMessage.MessageUuid     := GenUUID();
+StatusMessage.MessageCategory := 'Status';
+StatusMessage.TimeStamp       := DINT_TO_STRING(DT_TO_DINT(currentDateTime));
+
+CurrentMessageUID := StatusMessage.MessageUuid;
+CurrentMessageCategory := StatusMessage.MessageCategory;
+
+// Assign values to the PLC status removing for now as SAM doesn't do anything with this right now
+//StatusMessage.Status.Plc.State := 'SUSPENDED';
+//StatusMessage.Status.Plc.Message := 'Infeed starved';
+
+// Assign values to the Tasks array
+// Task 1
+
+FOR i := 1 TO MAX_TASKS DO
+    StatusMessage.Status.Tasks[i].State           := TO_STRING(_Tasks[i].Task.Info.State);
+    StatusMessage.Status.Tasks[i].CurrentTaskId   := _Tasks[i].Task.Info.CurrentTaskId;
+    StatusMessage.Status.Tasks[i].LineNumber      := _Tasks[i].Task.Info.LineNumber;
+    StatusMessage.Status.Tasks[i].StationName     := _Tasks[i].Task.Info.StationName;
+    StatusMessage.Status.Tasks[i].SubStation      := _Tasks[i].Task.Info.SubStation;
+    StatusMessage.Status.Tasks[i].TotalTaskSteps  := _Tasks[i].Task.Info.TotalTaskSteps;
+    StatusMessage.Status.Tasks[i].CurrentTaskStep := _Tasks[i].Task.Info.CurrentTaskStep;
+END_FOR;
+
+//Removing for now as SAM doesn't do anything with this information at the moment but has potential in the future
+// // Assign values to the Alerts array
+// // Alert 1
+// i := 1;
+// StatusMessage.Status.Alerts[i].Level := 'WARNING';
+// StatusMessage.Status.Alerts[i].Message := 'NoPlates';
+// 
+// // Alert 2
+// i := 2;
+// StatusMessage.Status.Alerts[i].Level := 'ERROR';
+// StatusMessage.Status.Alerts[i].Message := 'Garrick';
+
+// Build the JSON payload
+fbJson.ResetDocument();
+fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'ST_Messages', SIZEOF(StatusMessage), ADR(StatusMessage));
+
+// Copy the JSON document into sPayload
+fbJson.CopyDocument(sPayload, SIZEOF(sPayload));
+
+nPayloadLength    := LEN2(ADR(sPayload));
+nLENofPayloadSize := LEN(UDINT_TO_STRING(nPayloadLength));
+sLENofPayloadSize := UDINT_TO_STRING(nPayloadLength);
+
+(* Construct the full message with headers and footers using CONCAT2 *)
+sRequestMessage := '';
+CONCAT2(ADR(sRequestMessage), ADR(MESSAGE_START), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+CONCAT2(ADR(sRequestMessage), ADR(PROTOCOL_VERSION), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := 'JSON  ';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := REPLACE('000000000000', sLENofPayloadSize, nLENofPayloadSize, 13 - nLENofPayloadSize);
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := '  ';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+//Add Payload in
+CONCAT2(ADR(sRequestMessage), ADR(sPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+sTempPayload := '>>>endOfPacket__';
+CONCAT2(ADR(sRequestMessage), ADR(sTempPayload), ADR(sRequestMessage), SIZEOF(sRequestMessage));
+
+ComposeStatus := sRequestMessage;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CreateEvents" Id="{15b53549-9818-45dc-b3f1-eca4db34554d}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Add your event creation here
+
+// Super call to base
+
+SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{628c2060-2871-43d3-9ef4-7377b1901028}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+SUPER^.CyclicLogic();
+
+(* On PLC reset or program download close all old (opened) connections *)
+
+fbCloseAll(sSrvNetID := sSrvNetID, bExecute := _InitComplete);
+
+IF fbCloseAll.bBusy OR fbCloseAll.bError THEN
+    RETURN;
+END_IF
+
+//fbClient(sSrvNetId := sSrvNetID, bEnable := bEnable, bLog := bLog);
+
+(*-------------------------- Trigger data exchange -----------------------------------------------*)
+
+fbConnection(sSrvNetID   := sSrvNetID,
+             fbRx        := fbRx,
+             fbTx        := fbTx,
+             fbLog       := fbLog,
+             bEnable     := bEnable,
+             sRemoteHost := SERVER_IP,
+             nRemotePort := SERVER_PORT,
+             bLog        := bLog,
+             sPrefix     := sPrefix,
+             eState      => eState);
+
+IF fbConnection.eState = eSOCKET_CONNECTED THEN (* Connection established *)
+    Application();
+    //fbApplication( fbTx := fbTx, fbRx := fbRx, fbLog := fbLog );
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ExtractMetaData" Id="{f115e424-4b84-4d66-90b7-53e0acebd68d}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD ExtractMetaData : STRING
+VAR_INPUT
+    sInputString : STRING; // The string to search within
+    sTag         : STRING; // The metadata tag to find
+END_VAR
+
+VAR
+    iPosTag        : INT;
+    iPosValueStart : INT;
+    iPosValueEnd   : INT;
+    iValueLength   : INT;
+    sValue         : STRING[20]; // Adjust size based on expected number length
+    c              : BYTE;
+    testn          : INT := 1;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialize return value
+ExtractMetaData := ''; // Default value if not found or error
+c               := sInputString[testn];
+// Find the position of the tag in the input string
+iPosTag := FIND(sInputString, sTag);
+
+IF iPosTag <> 0 THEN
+    // Position where the value starts (immediately after the tag)
+    iPosValueStart := iPosTag + LEN(sTag);
+
+    // Initialize iPosValueEnd to the start position
+    iPosValueEnd := iPosValueStart;
+
+    // Loop to find the end of the numeric value
+    WHILE (iPosValueEnd <= LEN(sInputString)) DO
+        c := sInputString[iPosValueEnd];
+
+        IF c <> F_ToASC('$N') THEN
+            // It's not EOL, continue
+            iPosValueEnd := iPosValueEnd + 1;
+        ELSE
+            // EOL found
+            EXIT;
+        END_IF
+    END_WHILE
+
+    // Calculate the length of the numeric value
+    iValueLength := iPosValueEnd - iPosValueStart + 1;
+
+    IF iValueLength > 0 THEN
+        // Extract the numeric value as a string
+        sValue := MID(sInputString, iValueLength, iPosValueStart);
+
+        // Convert the string to an integer
+        ExtractMetaData := sValue;
+    ELSE
+        // No numeric value found after the tag
+        ExtractMetaData := ''; // Or handle as needed
+    END_IF
+ELSE
+    // Tag not found
+    ExtractMetaData := ''; // Or handle as needed
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GenUUID" Id="{c5a29d57-cd30-40bb-ab18-fcb157a8bbb9}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD GenUUID : STRING[32]
+VAR_INPUT
+END_VAR
+
+VAR
+    uuid_str      : STRING[32];
+    alpha_numeric : STRING[17] := '0123456789ABCDEF';
+    i             : INT;
+    Seed          : INT;
+    Random        : DRAND;
+    rnum          : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(* Generate UUID *)
+FOR i := 1 TO 32 DO
+    Seed        := TIME_TO_INT(TIME());
+    Random.Seed := Seed;
+    Random();
+    rnum     := LREAL_TO_INT(Random.Num * 16);
+    uuid_str := CONCAT(uuid_str, MID(alpha_numeric, 1, rnum));
+END_FOR
+
+GenUUID := uuid_str;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="InfeedLineNumberCheck" Id="{6703495c-fff6-4fcb-bdb7-4f020f43c7ae}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD InfeedLineNumberCheck : INT
+VAR_INPUT
+    Alternate    : BOOL;
+    PreviousLine : INT;
+END_VAR
+
+VAR
+    jig2Calc : LREAL;
+    jig3Calc : LREAL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF UseLineOneOnly = FALSE THEN
+    jig2Calc := USINT_TO_LREAL(_OutfeedConveyorStatus_Jig2.Occupied) / UDINT_TO_LREAL(_OutfeedConveyorStatus_Jig2.Total);
+    jig3Calc := USINT_TO_LREAL(_OutfeedConveyorStatus_Jig3.Occupied) / UDINT_TO_LREAL(_OutfeedConveyorStatus_Jig3.Total);
+
+    IF Alternate = FALSE THEN
+        IF jig2Calc = 1 AND jig3Calc = 1 THEN
+            InfeedLineNumberCheck := 0;
+        ELSIF jig2Calc = 1 THEN
+            InfeedLineNumberCheck := 2;
+        ELSIF jig3Calc = 1 THEN
+            InfeedLineNumberCheck := 1;
+        ELSIF jig2Calc <= jig3Calc THEN
+            InfeedLineNumberCheck := 1;
+        ELSE
+            InfeedLineNumberCheck := 2;
+        END_IF
+    ELSE
+        IF jig2Calc = 1 AND jig3Calc = 1 THEN
+            InfeedLineNumberCheck := 0;
+        ELSIF jig2Calc = 1 THEN
+            InfeedLineNumberCheck := 2;
+        ELSIF jig3Calc = 1 THEN
+            InfeedLineNumberCheck := 1;
+        ELSE
+            IF PreviousLine = 1 THEN
+                InfeedLineNumberCheck := 2;
+            ELSE
+                InfeedLineNumberCheck := 1;
+            END_IF
+        END_IF
+    END_IF
+ELSE
+    InfeedLineNumberCheck := 1;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{956f62a4-df48-4f82-9e8c-09ab03b5fb1d}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //CreateTask('Infeed');
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="IsIdleTask" Id="{84e0a560-7581-4a87-83aa-c40537e5e2dc}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD IsIdleTask : BOOL
+VAR_INPUT
+    State : E_TaskState;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF State = E_TaskState.ACTIVE OR State = E_TaskState.PENDING OR State = E_TaskState.RECOVERY THEN
+    IsIdleTask := FALSE;
+ELSE
+    IsIdleTask := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="OutfeedConveyorStatus_Jig2" Id="{dc675ab5-4699-4287-b381-baceb9ca043e}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OutfeedConveyorStatus_Jig2 : ST_OutfeedConveyorStatus]]></Declaration>
+      <Set Name="Set" Id="{984e6cfe-2c86-47cd-8342-b54ab3d7075d}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_OutfeedConveyorStatus_Jig2 := OutfeedConveyorStatus_Jig2;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="OutfeedConveyorStatus_Jig3" Id="{2a25253b-e2eb-429c-9805-05cc07601bb5}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY OutfeedConveyorStatus_Jig3 : ST_OutfeedConveyorStatus]]></Declaration>
+      <Set Name="Set" Id="{cd0a01bc-478b-4734-b41a-95aa12057485}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_OutfeedConveyorStatus_Jig3 := OutfeedConveyorStatus_Jig3;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="ParseCSVData" Id="{beb559d2-2305-46b6-b709-cf54846ebfe9}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD ParseCSVData
+VAR_IN_OUT
+    Task : ST_Task;
+END_VAR
+
+VAR
+    CSV           : ST_CSV_Generic;
+    FileContent   : STRING[25000];
+    Line          : STRING[255];
+    FileLine      : STRING[255];
+    LineIndex     : INT := 1;
+    i             : UDINT;
+    commaPos      : UDINT;
+    endPos        : UDINT;
+    newlinePos    : INT;
+    ParsingStep   : UDINT;
+    ParsingDetail : UDINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialize FileContent with the raw string
+FileContent := Task.Data;
+MEMSET(ADR(CSV), 0, SIZEOF(CSV));
+
+// Loop until all lines are processed
+WHILE (LEN(FileContent) > 0) DO
+    // Find the position of '$N' to identify the end of a line
+    newlinePos := FIND(FileContent, '$N');
+
+    IF newlinePos > 0 THEN
+        // Extract the line including the '$N' marker
+        Line := LEFT(FileContent, newlinePos);
+
+        // Remove the processed line from FileContent
+
+        MEMMOVE(ADR(FileContent), ADR(FileContent[newlinePos]), SIZEOF(FileContent)); (* Move/shift remaining bytes in buffer *)
+
+    //FileContent := REPLACE(FileContent, '', 1, newlinePos + LEN('$N'));
+    ELSE
+        // If no '$N' is found, take the rest as the last line
+        Line        := FileContent;
+        FileContent := '';
+    END_IF
+
+    // Skip empty lines or lines that only contain '$N' or Comment lines (!!)
+    IF (LEN(Line) = 0) OR (Line = '$N') OR FIND(Line, '!!') > 0 THEN
+        CONTINUE;
+    END_IF
+
+    // Prepare to parse the details in the line
+    FileLine := Line;
+
+    // Loop to extract up to MAX_DATA_COUNT details separated by commas
+    FOR i := 1 TO MAX_DATA_COUNT DO
+        commaPos := FIND2(ADR(FileLine), ADR(','));
+        endPos   := FIND2(ADR(FileLine), ADR('$N'));
+
+        IF commaPos > 0 THEN
+            // Copy the detail up to the comma into your CSV structure
+            MEMCPY(ADR(CSV.CSVLines[LineIndex].Fields[i]), ADR(FileLine), commaPos - 1);
+
+            // Remove the extracted detail from FileLine
+            MEMMOVE(ADR(FileLine), ADR(FileLine[commaPos]), SIZEOF(FileLine)); (* Move/shift remaining bytes in buffer *)
+        ELSIF endPos > 0 THEN
+            // Copy the last detail (no more commas found)
+            MEMCPY(ADR(CSV.CSVLines[LineIndex].Fields[i]), ADR(FileLine), endPos - 1);
+            EXIT; // Exit the loop since there are no more details
+        END_IF
+
+    END_FOR
+
+    //Inject into CSV Step Structure
+    IF CSV.CSVLines[LineIndex].Fields[1] = 'SeqStart' THEN
+        ParsingStep                             := STRING_TO_UDINT(CSV.CSVLines[LineIndex].Fields[3]);
+        Task.CSV.Steps[ParsingStep].seqID       := ParsingStep;
+        Task.CSV.Steps[ParsingStep].seqName     := STRING_TO_E_CommandName(CSV.CSVLines[LineIndex].Fields[2]);
+        Task.CSV.Steps[ParsingStep].DetailCount := STRING_TO_UDINT(CSV.CSVLines[LineIndex].Fields[4]);
+    ELSIF CSV.CSVLines[LineIndex].Fields[1] = 'SeqDetail' THEN
+        ParsingDetail                                                := STRING_TO_UDINT(CSV.CSVLines[LineIndex].Fields[2]);
+        Task.CSV.Steps[ParsingStep].Details[ParsingDetail].DetailID  := ParsingDetail;
+        Task.CSV.Steps[ParsingStep].Details[ParsingDetail].DataCount := STRING_TO_UDINT(CSV.CSVLines[LineIndex].Fields[3]);
+
+        FOR j := 1 TO Task.CSV.Steps[ParsingStep].Details[ParsingDetail].DataCount DO
+            Task.CSV.Steps[ParsingStep].Details[ParsingDetail].Datas[j] := CSV.CSVLines[LineIndex].Fields[j + 3];
+        END_FOR
+    ELSIF CSV.CSVLines[LineIndex].Fields[1] = 'SeqEnd' THEN
+        Task.Info.TotalTaskSteps := STRING_TO_DINT(CSV.CSVLines[LineIndex].Fields[3]);
+    END_IF
+
+    // Move to the next line index
+    LineIndex := LineIndex + 1;
+END_WHILE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ProcessReceivedMessage" Id="{c515d1de-92c7-468a-bb49-e7e02daf7dd6}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD ProcessReceivedMessage : BOOL
+VAR_INPUT
+    sReceiveData : STRING[25000];
+END_VAR
+
+VAR
+    nPayloadLength    : INT;
+    nLENofPayloadSize : INT;
+    sPayloadSize      : STRING(36);
+    sMessageBody      : STRING[25000];
+    uuid_str          : STRING(36);
+    fbTime            : FB_LocalSystemTime := (bEnable := TRUE);
+    currentDateTime   : DATE_AND_TIME;
+    eContentType      : E_ContentType; (* Enum for message content type *)
+    sMessageCategory  : STRING(20); (* JSON Message Category *)
+    eMessageCategory  : E_MessageCategory; (* Enum for message category *)
+    sInResponseToUuid : STRING(36); (* JSON InResponseToUuid *)
+
+    fbJson   : FB_JsonDomParser;
+    jsonRoot : SJsonValue;
+    jsonProp : SJsonValue;
+
+    jig2Calc : LREAL;
+    jig3Calc : LREAL;
+
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(* Determine message type and set enum value *)
+
+MEMSET(ADR(sMessageBody), 0, SIZEOF(sMessageBody));
+
+IF FIND2(ADR(sReceiveData), ADR('JSON'),) > 0 THEN
+    eContentType := E_ContentType.CT_JSON;
+    MEMCPY(ADR(sPayloadSize), ADR(sReceiveData[34]), 12);
+    MEMCPY(ADR(sMessageBody), ADR(sReceiveData[48]), STRING_TO_UDINT(sPayloadSize));
+ELSIF FIND2(ADR(sReceiveData), ADR('ACK'),) > 0 THEN
+    eContentType := E_ContentType.CT_JSON;
+    MEMCPY(ADR(sPayloadSize), ADR(sReceiveData[34]), 12);
+    MEMCPY(ADR(sMessageBody), ADR(sReceiveData[48]), STRING_TO_UDINT(sPayloadSize));
+ELSIF FIND2(ADR(sReceiveData), ADR('NOTASK'),) > 0 THEN
+    eContentType := E_ContentType.CT_JSON;
+    MEMCPY(ADR(sPayloadSize), ADR(sReceiveData[34]), 12);
+    MEMCPY(ADR(sMessageBody), ADR(sReceiveData[48]), STRING_TO_UDINT(sPayloadSize));
+ELSIF FIND2(ADR(sReceiveData), ADR('CSV')) > 0 THEN
+    eContentType := E_ContentType.CT_CSV;
+    MEMCPY(ADR(sPayloadSize), ADR(sReceiveData[34]), 12);
+    MEMCPY(ADR(sMessageBody), ADR(sReceiveData[48]), STRING_TO_UDINT(sPayloadSize));
+ELSE
+    eContentType           := E_ContentType.CT_NONE;
+    ProcessReceivedMessage := FALSE;
+    fbLog.Message(sMessage := 'Failed to read Content type of Message from SAM');
+    RETURN;
+END_IF
+
+(* Process JSON message *)
+IF eContentType = E_ContentType.CT_JSON THEN
+    fbJson.ParseDocument(sMessageBody);
+    jsonRoot := fbJson.GetDocumentRoot();
+
+    (* Extract Message Category and UUID *)
+    jsonProp := fbJson.FindMember(jsonRoot, 'MessageCategory');
+
+    IF (jsonProp <> 0) THEN
+        sMessageCategory := fbJson.GetString(jsonProp);
+    END_IF
+
+    jsonProp := fbJson.FindMember(jsonRoot, 'InResponseToUuid');
+
+    IF (jsonProp <> 0) THEN
+        sInResponseToUuid := fbJson.GetString(jsonProp);
+    END_IF
+
+    (* Set the message category enum based on extracted value using FIND *)
+    IF sMessageCategory = 'RequestForInfo' THEN
+        eMessageCategory       := E_MessageCategory.MC_RFI;
+        ProcessReceivedMessage := TRUE;
+    ELSIF sMessageCategory = 'Info' THEN
+        eMessageCategory := E_MessageCategory.MC_INFO;
+        fbLog.Message(sMessage := 'RFI message response received.');
+        Trace(CONCAT('RFI message response received: Task # -> ', INT_TO_STRING(RFT_Index)));
+        ProcessReceivedMessage := TRUE;
+    ELSIF sMessageCategory = 'Task' THEN
+        eMessageCategory := E_MessageCategory.MC_TASK;
+        fbLog.Message(sMessage := 'TASK message response received.');
+        Trace(CONCAT('TASK message response received: Task # -> ', INT_TO_STRING(RFT_Index)));
+        ProcessReceivedMessage := TRUE;
+    ELSIF sMessageCategory = 'NoTask' = 1 THEN
+        eMessageCategory                     := E_MessageCategory.MC_NOTASK;
+        _Tasks[RFT_Index].Task.RFT_Requested := FALSE;
+        //indexing to next task due to no task being received for current
+        IF RFT_Index = 1 THEN
+            _Tasks[RFT_Index].Task.Info.State := E_TaskState.IDLE;
+            InfeedPreviousLineRequest         := _Tasks[RFT_Index].Task.Info.LineNumber;
+            InfeedAlternateLine               := TRUE;
+        END_IF
+
+        ProcessReceivedMessage := TRUE;
+
+        fbLog.Message(sMessage := 'NOTASK message response received.');
+        Trace(CONCAT('NOTASK message response received: Task # -> ', INT_TO_STRING(RFT_Index)));
+        Trace(CONCAT('NOTASK message response for Line number -> ', INT_TO_STRING(_Tasks[RFT_Index].Task.Info.LineNumber)));
+    ELSIF sMessageCategory = 'Status' THEN
+        eMessageCategory       := E_MessageCategory.MC_STATUS;
+        ProcessReceivedMessage := TRUE;
+    ELSIF sMessageCategory = 'StatusAck' THEN
+        eMessageCategory := E_MessageCategory.MC_STATUS_ACK;
+        fbLog.Message(sMessage := 'STATUS ACK message response received.');
+        Trace(CONCAT('STATUS ACK message response received: Task # -> ', INT_TO_STRING(RFT_Index)));
+        // 
+        //         IF CurrentMessageUID = sInResponseToUuid THEN
+        //             //Success!
+        //             ProcessReceivedMessage := TRUE;
+        //         ELSE
+        //             //No Success!
+        //             ProcessReceivedMessage := FALSE;
+        //         END_IF
+        ProcessReceivedMessage := TRUE;
+    ELSIF sMessageCategory = 'NAK' THEN
+        eMessageCategory := E_MessageCategory.MC_NAK;
+        fbLog.Message(sMessage := 'STATUS NOT ACK message response received.');
+        Trace(CONCAT('STATUS NOT ACK message response received: Task # -> ', INT_TO_STRING(RFT_Index)));
+        ProcessReceivedMessage := TRUE;
+    ELSE
+        eMessageCategory       := E_MessageCategory.MC_NONE;
+        ProcessReceivedMessage := TRUE;
+    END_IF
+ELSIF eContentType = E_ContentType.CT_CSV THEN
+    //ParseCSV Here
+
+    IF NOT IsIdleTask(_Tasks[RFT_Index].Task.Info.State) THEN
+        //if duplicate CSV is recieved when the task is running, ignore new task and keep running old one.
+        Trace(CONCAT('Data Parsed for ActiveTask: Task # -> ', INT_TO_STRING(RFT_Index)));
+        ProcessReceivedMessage := TRUE;
+    ELSE
+        _Tasks[RFT_Index].Task.Data               := sMessageBody;
+        _Tasks[RFT_Index].Task.Info.CurrentTaskId := STRING_TO_UDINT(ExtractMetaData(sInputString := sMessageBody, sTag := 'SAM Task Id:'));
+        ParseCSVData(Task := _Tasks[RFT_Index].Task);
+
+        ProcessReceivedMessage            := TRUE;
+        _Tasks[RFT_Index].Task.Info.State := E_TaskState.PENDING;
+        Trace(CONCAT('CSV parsed from ProcessReceivedMessage: Task # -> ', INT_TO_STRING(RFT_Index)));
+        Trace(CONCAT('CSV parsed for Line number -> ', INT_TO_STRING(_Tasks[RFT_Index].Task.Info.LineNumber)));
+    END_IF
+
+    _Tasks[RFT_Index].Task.RFT_Requested := FALSE;
+
+    //     IF CurrentMessageUID = sInResponseToUuid THEN
+    //         //Success!
+    //         ProcessReceivedMessage            := TRUE;
+    //         _Tasks[RFT_Index].Task.Info.State := E_TaskState.PENDING;
+    //         fbLog.Error(sMessage := 'CSV parsed from ProcessReceivedMessage');
+    //     ELSE
+    //         //No Success!
+    //         ProcessReceivedMessage := FALSE;
+//     END_IF
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="RaiseAlarm2Args" Id="{792cb649-bee3-4d47-854e-d5952f18a2c3}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD RaiseAlarm2Args
+VAR_IN_OUT
+    fbAlarm : FB_TcAlarm; //Alarm to be raised
+END_VAR
+
+VAR_INPUT
+    String_1 : STRING; //First String Parameter (The Name of this component will be applied first automatically)
+    String_2 : STRING; //Second String Parameter
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[F_RaiseAlarmWithStringParameters(Alarm := fbAlarm, String_1 := Name, String_2 := String_1, String_3 := String_2);]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="STRING_TO_E_CommandName" Id="{758627e1-a308-4acb-b212-ef944b6a8d64}" FolderPath="Methods\AppMethods\">
+      <Declaration><![CDATA[METHOD STRING_TO_E_CommandName : E_CommandName
+VAR_INPUT
+    Name : STRING;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF Name = 'AssemblyStart' THEN
+    STRING_TO_E_CommandName := E_CommandName.AssemblyStart;
+ELSIF Name = 'TrussInfo' THEN
+    STRING_TO_E_CommandName := E_CommandName.TrussInfo;
+ELSIF Name = 'PuckMove' THEN
+    STRING_TO_E_CommandName := E_CommandName.PuckMove;
+ELSIF Name = 'PickPlace' THEN
+    STRING_TO_E_CommandName := E_CommandName.PickPlace;
+ELSIF Name = 'ManualBoard' THEN
+    STRING_TO_E_CommandName := E_CommandName.ManualBoard;
+ELSIF Name = 'BoardInfo' THEN
+    STRING_TO_E_CommandName := E_CommandName.BoardInfo;
+ELSIF Name = 'Board' THEN
+    STRING_TO_E_CommandName := E_CommandName.Board;
+ELSIF Name = 'NailPlate' THEN
+    STRING_TO_E_CommandName := E_CommandName.NailPlate;
+ELSIF Name = 'IndexConveyor' THEN
+    STRING_TO_E_CommandName := E_CommandName.IndexConveyor;
+ELSIF Name = 'ManualPlate' THEN
+    STRING_TO_E_CommandName := E_CommandName.ManualPlate;
+ELSIF Name = 'AssemblyEnd' THEN
+    STRING_TO_E_CommandName := E_CommandName.AssemblyEnd;
+ELSE
+    // Handle unknown command name
+
+    STRING_TO_E_CommandName := E_CommandName.Unknown;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Tasks" Id="{e9201bbb-dff1-4cf5-9420-dbd23ec02b36}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Tasks : ARRAY[1..MAX_TASKS] OF ST_TaskREF;]]></Declaration>
+      <Set Name="Set" Id="{0d09eec2-2926-44e8-9c65-fc547248d1db}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Tasks := Tasks;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

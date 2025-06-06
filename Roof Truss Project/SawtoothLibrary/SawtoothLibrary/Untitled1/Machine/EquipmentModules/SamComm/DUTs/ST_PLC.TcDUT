@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_PLC" Id="{cf8d2c51-e5b5-4a26-8947-278f345bec7a}">
+    <Declaration><![CDATA[TYPE
+    ST_PLC : STRUCT
+        State   : STRING[20]; // E.g., "SUSPENDED"
+        Message : STRING[100]; // Adjust size based on expected message lengths
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

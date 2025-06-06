@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Board" Id="{619f5390-8036-4611-9ce2-da114c46bb8a}">
+    <Declaration><![CDATA[TYPE
+    ST_Board : STRUCT
+        BoardID                 : STRING;
+        BoardWidth              : REAL;
+        BoardHeight             : REAL;
+        BoardLength             : REAL;
+        BoardNumber             : INT;
+        LeadingEdgeBevelOffset  : REAL;
+        TrailingEdgeBevelOffset : REAL;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

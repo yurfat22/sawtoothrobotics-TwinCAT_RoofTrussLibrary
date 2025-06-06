@@ -1,0 +1,225 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_Stacklight" Id="{57e76f9c-9b89-4df8-a670-5ec72f1cb1e3}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_StackLight EXTENDS FB_ComponentBase_SR IMPLEMENTS I_StackLight
+VAR
+    // Inputs
+
+    _SystemState        : Tc3_PackML_V2.E_PMLState;
+    _SystemErrorPresent : BOOL;
+
+    // Outputs
+
+    GreenLight : FB_Component_Indicator;
+    AmberLight : FB_Component_Indicator;
+    RedLight   : FB_Component_Indicator;
+    Siren      : FB_Component_Indicator;
+
+    // HMI
+
+    // Alarms
+
+    StackLightAlarms : ARRAY[1..STACKLIGHT_ALARMS_COUNT] OF FB_TcAlarm;
+
+    // Internal variables
+
+END_VAR
+
+VAR CONSTANT
+    STACKLIGHT_ALARMS_COUNT : UDINT := 5;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_ComponentBase" Id="{114604cd-2a67-48a5-a41c-24dfbd55d888}" />
+    <Folder Name="I_CyclicFB" Id="{d69cc868-b3c0-4be4-b8a3-27ca95d8db4d}" />
+    <Folder Name="I_Stacklight" Id="{513a7679-88c6-42e0-bb1a-35dc77ee1671}" />
+    <Folder Name="Methods" Id="{aca8dc96-7331-4e79-a2dc-25c903ba6dae}" />
+    <Folder Name="Properties" Id="{9835304e-3664-40c6-837d-ce6cd407f585}" />
+    <Method Name="CreateEvents" Id="{1774bdf6-87c0-48d1-b592-ec0f16ee88e2}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{2ce9734c-a0f5-43f6-be3a-1e4a5c1f4a8d}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+//// Main logic for StackLight control
+
+CASE _SystemState OF
+    ePMLState_Execute, ePMLState_Completing:
+        IF NOT _SystemErrorPresent THEN
+            GreenLight.TurnOn();
+            AmberLight.TurnOff();
+            RedLight.TurnOff();
+            Siren.TurnOff();
+        ELSE
+            GreenLight.TurnOn();
+            AmberLight.TurnOff();
+            RedLight.Flash();
+            Siren.TurnOff();
+        END_IF
+
+    ePMLState_Idle:
+        GreenLight.Flash();
+        AmberLight.TurnOff();
+        RedLight.TurnOff();
+        Siren.TurnOff();
+
+    ePMLState_Starting, ePMLState_Unholding, ePMLState_Unsuspending:
+        GreenLight.TurnOn();
+        AmberLight.TurnOff();
+        RedLight.TurnOff();
+        Siren.OffTime := TIME#500MS;
+        Siren.Flash();
+
+    ePMLState_Holding:
+        GreenLight.TurnOff();
+        AmberLight.Flash();
+        RedLight.TurnOff();
+        Siren.TurnOff();
+
+    ePMLState_Held:
+        GreenLight.TurnOff();
+        AmberLight.TurnOn();
+        RedLight.TurnOff();
+        Siren.TurnOff();
+
+    ePMLState_Suspended:
+        GreenLight.TurnOff();
+        AmberLight.TurnOn();
+        RedLight.Flash();
+        Siren.OffTime := TIME#5S;
+        Siren.Flash();
+
+    ePMLState_Stopped, ePMLState_Clearing, ePMLState_Aborted, ePMLState_Aborting, ePMLState_Complete:
+        GreenLight.TurnOff();
+        AmberLight.TurnOff();
+        RedLight.TurnOn();
+        Siren.TurnOff();
+
+    ePMLState_Resetting:
+        GreenLight.TurnOff();
+        AmberLight.TurnOff();
+        RedLight.Flash();
+        Siren.TurnOn();
+
+ELSE
+    GreenLight.TurnOff();
+    AmberLight.TurnOff();
+    RedLight.TurnOff();
+    Siren.TurnOff();
+END_CASE
+
+IF _SystemErrorPresent THEN
+    RedLight.Flash();
+    Siren.OnTime  := T#100MS;
+    Siren.OffTime := T#10S;
+    Siren.Flash();
+END_IF
+
+GreenLight.CyclicLogic();
+AmberLight.CyclicLogic();
+RedLight.CyclicLogic();
+Siren.CyclicLogic();
+
+// Component Error
+
+//{error 'Create Component has Error'}
+
+//_Error := TRUE;
+
+//_ErrorID := 9999;
+
+// Component Busy
+
+//{error 'Create Component is Busy'}
+
+IF TRUE THEN
+    _Busy := TRUE;
+ELSE
+    _Busy := FALSE;
+END_IF
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+////_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := StackLightAlarms, CurrentSeverity := _CurrentSeverity, Severity := _CurrentAlarmSeverity);
+]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{3c5f644c-4c08-43ad-9d00-ed071f1e610e}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{3ede4cbb-03b3-4cea-9c6e-e0765fa516a2}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="SystemErrorPresent" Id="{77c78f40-7f98-47bd-aec8-341dba11960c}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY SystemErrorPresent : BOOL]]></Declaration>
+      <Get Name="Get" Id="{ecd40feb-0d8a-43d5-ad95-73f7fcab2db9}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SystemErrorPresent := _SystemErrorPresent;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{74316eeb-1ded-49ee-816f-8e04d25078bc}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SystemErrorPresent := SystemErrorPresent;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="SystemState" Id="{cea6f761-cd3f-45a3-81eb-27f9cbce08ea}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY SystemState : Tc3_PackML_V2.E_PMLState]]></Declaration>
+      <Get Name="Get" Id="{d212630a-b593-42d5-8d57-d607123327e7}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[SystemState := _SystemState;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{f8b93fff-6f35-452a-a2f3-d2432e212355}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_SystemState := SystemState;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+  </POU>
+</TcPlcObject>

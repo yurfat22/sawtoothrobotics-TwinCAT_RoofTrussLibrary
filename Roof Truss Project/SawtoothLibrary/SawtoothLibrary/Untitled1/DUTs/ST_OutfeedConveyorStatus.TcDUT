@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_OutfeedConveyorStatus" Id="{50bec105-fe1a-414a-b3af-599415a73510}">
+    <Declaration><![CDATA[TYPE
+    ST_OutfeedConveyorStatus : STRUCT
+        Occupied : USINT;
+        Total    : UDINT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

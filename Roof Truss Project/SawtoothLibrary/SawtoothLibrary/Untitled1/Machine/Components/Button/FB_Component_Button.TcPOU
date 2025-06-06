@@ -1,0 +1,85 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Component_Button" Id="{72fb166f-ea72-4485-930d-4ef4de5de7c8}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Component_Button EXTENDS FB_ComponentBase_SR
+VAR
+    Button : FB_DigitalSensor := (Name := 'Button');
+    LED    : FB_Component_Indicator;
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{9733f78b-86e2-4445-a4f7-6da472c3d726}" />
+    <Folder Name="Methods" Id="{b41ce848-39cb-48fc-8456-3ab41e0959d7}" />
+    <Folder Name="Properties" Id="{2d109ccf-bb6d-4aaf-ab7e-0714108cf1b3}" />
+    <Property Name="Button_Pressed" Id="{34cb5c42-e8f0-42c2-8e4a-fcba81a47b63}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Button_Pressed : bool]]></Declaration>
+      <Get Name="Get" Id="{48ed52c0-b163-4582-956b-54604c891d58}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Button_Pressed := Button.Active;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="CreateEvents" Id="{a8d77d75-df5a-45ab-850d-19096ed0967c}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{2aa2a76e-376f-4c07-859b-7c0d59bfc098}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+//Custom Component Logic goes here
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := Comp_Alarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+Button.CyclicLogic();
+LED.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{8a42b7ba-55fa-4fcc-9c93-9ce8d3920123}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Monitoring" Id="{bf7fe797-dd60-4081-8bde-b13d5ee9b3d5}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,127 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_ControlPendant" Id="{f2f9d19c-73f8-4705-ac2e-84188de1011d}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ControlPendant EXTENDS FB_ComponentBase_SR
+VAR
+    KeySwitch_Idle    : FB_DigitalSensor := (Name := 'KeySwitch_Idle'); // Auto mode key switch
+    KeySwitch_Auto    : FB_DigitalSensor := (Name := 'KeySwitch_Auto'); // Manual mode forward
+    KeySwitch_Manual1 : FB_DigitalSensor := (Name := 'KeySwitch_Manual1'); // Manual mode reverse
+    KeySwitch_Manual2 : FB_DigitalSensor := (Name := 'KeySwitch_Manual2'); // Manual mode reverse
+
+    GreenButton  : FB_Component_Button := (Name := 'GreenButton');
+    YellowButton : FB_Component_Button := (Name := 'YellowButton');
+    BlueButton   : FB_Component_Button := (Name := 'BlueButton');
+
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{5af05c42-12cc-4d5c-aa5d-f56a024b184d}" />
+    <Folder Name="Methods" Id="{5786950b-5e9b-4996-ae2e-fedeb1d41b91}" />
+    <Folder Name="Properties" Id="{61f8d83c-40d5-4638-b765-b45075f1eb9a}" />
+    <Method Name="CreateEvents" Id="{f1c18878-6b31-4f8c-93f6-e8e1998d10fa}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED CreateEvents
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.CreateEvents();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicLogic" Id="{d84d966f-6623-497a-8f6f-1c6508f3d7e7}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[//! @summary This method serves as the entry point for all underlying FB logic
+METHOD PUBLIC CyclicLogic
+
+//! @description This method should be called cyclically by descendant function blocks by invoking <c>SUPER^.CyclicLogic()</c>.  Alternatively, the contents of this method could be reimplemented entirely in which case a call to this method would not be necessary.
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[// Initialise Component
+
+IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+//Custom Component Logic goes here
+
+// Call Super
+
+SUPER^.CyclicLogic();
+
+// Set Current Alarm Severity
+
+_CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms := Comp_Alarms, CurrentSeverity := _CurrentAlarmSeverity);
+
+KeySwitch_Idle.CyclicLogic();
+KeySwitch_Auto.CyclicLogic();
+KeySwitch_Manual1.CyclicLogic();
+KeySwitch_Manual2.CyclicLogic();
+
+GreenButton.CyclicLogic();
+YellowButton.CyclicLogic();
+BlueButton.CyclicLogic();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{2927a911-a3b3-434c-a76c-9dd2d370668f}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic component initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CreateEvents();
+
+IF SUPER^.Initialize() THEN
+    Initialize := TRUE;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Mode_Auto" Id="{9c757fc7-878e-4672-a6d2-22bac5e30185}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Mode_Auto : bool]]></Declaration>
+      <Get Name="Get" Id="{681eba80-9d6a-4488-af0f-d96eec8eb38d}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Mode_Auto := KeySwitch_Auto.Active;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Mode_Idle" Id="{834aed9d-1b6c-4e81-aa33-aa78a49b970a}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Mode_Idle : bool]]></Declaration>
+      <Get Name="Get" Id="{361979ff-ef34-434a-9197-1ca290611059}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Mode_Idle := NOT (KeySwitch_Auto.Active AND KeySwitch_Manual1.Active AND KeySwitch_Manual2.Active);]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Mode_Manual_1" Id="{ce793fb3-ac22-4a6d-bfc7-ff89dcef349e}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Mode_Manual_1 : bool]]></Declaration>
+      <Get Name="Get" Id="{622fc64a-f2da-4a2b-92f1-87136403de40}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Mode_Manual_1 := KeySwitch_Manual1.Active;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="Mode_Manual_2" Id="{d8c0e897-09ba-4482-9b32-22a9a8eb5e20}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Mode_Manual_2 : bool]]></Declaration>
+      <Get Name="Get" Id="{195de946-37c4-4b98-a190-b67f0f2d0ef2}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Mode_Manual_2 := KeySwitch_Manual2.Active;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="Monitoring" Id="{c7d46e35-8b94-4f92-b05c-ea19455986c0}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD PROTECTED Monitoring
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SUPER^.Monitoring();]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

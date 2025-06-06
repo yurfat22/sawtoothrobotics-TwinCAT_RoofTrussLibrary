@@ -1,0 +1,311 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_Handoff" Id="{70da996e-78d6-44ec-bec2-b5cc40f00560}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Handoff EXTENDS FB_EquipmentModule_SR
+VAR
+    // Sub module definitions here
+
+    // List of sub modules
+
+    ipSubModules_Init : ARRAY[1..Parameters_PackML_Base.MAX_NO_OF_SUBMODULES] OF I_PackML_BaseModule := [];
+
+    // Component definitions here
+
+    CenteringClamp     : ARRAY[1..2] OF FB_DoubleSolenoidRetractFeedback := [(Name := 'Clamp_1'), (Name := 'Clamp_2')];
+    BoardPresentSensor : FB_DigitalSensor                                := (Name := 'BoardPresentSensor');
+
+    _ClampsClosed : BOOL;
+END_VAR
+
+VAR CONSTANT
+
+    // Reports 
+
+    FAULT : INT := 1;
+
+    // Alarms
+
+    PULL_WHEELS_ALARM_COUNT : INT := 5;
+END_VAR
+
+VAR
+    _BoardDataToPass : ST_BoardData;
+    _Location        : LREAL;
+    _HoldingBoard    : BOOL;
+
+    _ClampsOpen : BOOL;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="I_CyclicFB" Id="{60b30b9f-13bb-4d98-9723-a91813391450}" />
+    <Folder Name="Methods" Id="{7677dcc4-de99-4bb2-94de-30decda7f97c}" />
+    <Folder Name="Properties" Id="{fcb5a7db-9494-4a81-b51a-d5a8f8326cfd}" />
+    <Property Name="ClampsClosed" Id="{d62e2521-b6b0-4a38-83da-6d69cfbf9f62}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ClampsClosed : bool]]></Declaration>
+      <Get Name="Get" Id="{e62dc733-dc06-402a-b106-887c215393d8}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ClampsClosed := _ClampsClosed;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ClampsOpen" Id="{d1dd4d10-0421-461d-93e4-d85eac30f7fe}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY ClampsOpen : bool]]></Declaration>
+      <Get Name="Get" Id="{26b61293-9d81-4ef0-a4ad-fef93cf56f94}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ClampsOpen := _ClampsOpen;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="CyclicLogic" Id="{2a27383a-3bdf-4b88-9dfa-fe4625c84c7f}" FolderPath="I_CyclicFB\">
+      <Declaration><![CDATA[METHOD CyclicLogic
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF NOT _InitComplete THEN
+    _InitComplete := Initialize();
+    RETURN;
+END_IF
+
+SUPER^.CyclicLogic();
+
+//HMI control for EM
+
+fbControlSourceHMI.CyclicLogic();
+
+//Set the current alarm severity for this module
+
+// _CurrentAlarmSeverity := F_GetMaxSeverityRaised(Alarms:=PullWheelAlarms, CurrentSeverity:=_CurrentAlarmSeverity);
+
+//Simulate Alarm Messaging
+
+IF (CenteringClamp[1].InSimulation OR CenteringClamp[1].Retracted) AND (CenteringClamp[2].InSimulation OR CenteringClamp[2].Retracted) THEN
+    _ClampsOpen := TRUE;
+ELSE
+    _ClampsOpen := FALSE;
+END_IF
+
+IF (CenteringClamp[1].InSimulation OR CenteringClamp[1].Extended) AND (CenteringClamp[2].InSimulation OR CenteringClamp[2].Extended) THEN
+    _ClampsClosed := TRUE;
+ELSE
+    _ClampsClosed := FALSE;
+END_IF
+
+// CyclicLogicSimulation();]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="DisableClamp1" Id="{f4898869-5589-495c-aac7-215a2e397a19}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY DisableClamp1 : BOOL]]></Declaration>
+      <Set Name="Set" Id="{01c09bbf-070f-40d5-a327-10c5a0a3640c}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[CenteringClamp[1].InSimulation := DisableClamp1;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="DisableClamp2" Id="{0f647c9a-201d-445d-b53d-a4c5cf5af2b3}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY DisableClamp2 : BOOL]]></Declaration>
+      <Set Name="Set" Id="{7e84259a-0f94-4fd0-9325-8e0707dce915}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[CenteringClamp[2].InSimulation := DisableClamp2;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="GrabBoard" Id="{30074c16-8805-4b76-8b9c-a185a15a2001}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD GrabBoard : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[GrabBoard := FALSE;
+
+FOR i := 1 TO 2 DO
+    CenteringClamp[i].Extend();
+END_FOR
+
+IF CenteringClamp[1].Extended AND CenteringClamp[1].Extended THEN
+    GrabBoard := TRUE;
+    // 	Trace('Clamp Closed');
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="HMIControl" Id="{7e2f3a4a-e0a7-47d0-befd-d576573fb5db}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD HMIControl
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF HMI_INPUT[1] THEN
+	FOR i := 1 TO 2 DO 
+		ReleaseBoard(); 
+	END_FOR
+END_IF
+
+IF HMI_INPUT[2] THEN
+	FOR i := 1 TO 2 DO 
+		GrabBoard(); 
+	END_FOR
+END_IF
+]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="HoldingBoard" Id="{bb7b46f1-f485-4aa9-b1e8-6b31ac586359}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY HoldingBoard : Bool]]></Declaration>
+      <Get Name="Get" Id="{a88e5869-f233-4605-a2af-bbcad9d0432d}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[HoldingBoard := _HoldingBoard;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{921ca532-95c2-494c-bd54-bec962bd8e85}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_HoldingBoard := HoldingBoard;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="Initialize" Id="{ae611370-cb56-48df-8475-dd2b27dfd90a}" FolderPath="Methods\">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+VAR
+    i                        : UDINT;
+    varInfo                  : __SYSTEM.VAR_INFO;
+    AllSubUnitsInitialized   : BOOL := TRUE;
+    AllComponentsInitialized : BOOL := TRUE;
+END_VAR
+
+//! @description This method is called by <c>CyclicLogic()</c> as required
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[Initialize := FALSE;
+
+CASE DescendantSequenceState OF
+    0:
+        RegisterComponent(BoardPresentSensor);
+
+        FOR i := 1 TO 2 DO
+            RegisterComponent(CenteringClamp[i]);
+        END_FOR
+
+        _LogModeChanges         := FALSE;
+        _LogStateChanges        := FALSE;
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    10:
+        //Setup Custom modes here
+
+        (*CustomModes(eMode                          :=,
+                    sName                          :=,
+                    bDisableClearing               :=,
+                    bDisableStarting               :=,
+                    bDisableSuspended              :=,
+                    bDisableStopping               :=,
+                    bDisableAborting               :=,
+                    bDisableHolding                :=,
+                    bDisableHeld                   :=,
+                    bDisableUnholding              :=,
+                    bDisableSuspending             :=,
+                    bDisableUnsuspending           :=,
+                    bDisableResetting              :=,
+                    bDisableIdle                   :=,
+                    bDisableCompleting             :=,
+                    bDisableComplete               :=,
+                    bEnableUnitModeChangeStopped   :=,
+                    bEnableUnitModeChangeIdle      :=,
+                    bEnableUnitModeChangeSuspended :=,
+                    bEnableUnitModeChangeExecute   :=,
+                    bEnableUnitModeChangeAborted   :=,
+                    bEnableUnitModeChangeHeld      :=,
+                    bEnableUnitModeChangeComplete  :=,
+                    bError                         =>,
+                    nErrorId                       =>);*)
+
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    20:
+        //Copy Mode names
+
+        FOR i := 1 TO 3 DO
+            ModeNames[i] := F_UnitModeToString(UDINT_TO_DINT(i));
+        END_FOR
+
+        RegisterExternalController(Controller := fbControlSourceHMI);
+        fbControlSourceHMI.CyclicLogic();
+        DescendantSequenceState := DescendantSequenceState + 10;
+
+    30:
+        //Call the Super
+
+        IF SUPER^.Initialize() THEN
+            DescendantSequenceState := DescendantSequenceState + 10;
+        END_IF
+
+    40:
+        Initialize := TRUE;
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Location" Id="{edc54518-17de-47a8-a768-b0f44af3d18b}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Location : LREAL]]></Declaration>
+      <Get Name="Get" Id="{a82cde8e-973d-4022-b722-fd1c01e84813}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Location := _Location;]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{4128df58-d7ea-4dfd-9927-fc63ffa4e234}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_Location := Location;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="ReleaseBoard" Id="{53bbb63b-1d98-4640-9fed-58e0300cc527}" FolderPath="Methods\">
+      <Declaration><![CDATA[METHOD ReleaseBoard : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ReleaseBoard := FALSE;
+
+FOR i := 1 TO 2 DO
+    CenteringClamp[i].Retract();
+END_FOR
+
+IF CenteringClamp[1].Retracted AND CenteringClamp[1].Retracted THEN
+    ReleaseBoard := TRUE;
+    // 	Trace('Clamp Opened');
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Request_WS" Id="{bbc4f125-8f63-48e8-9685-e90719f469bc}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Request_WS : E_WaitSync]]></Declaration>
+      <Set Name="Set" Id="{bdc578e3-a406-483d-91ae-b380bf1aeff0}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[_RequestedWaitSync := Request_WS;]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Property Name="Response_WS" Id="{8b560b72-76e6-4e35-bf39-9ecbde73da2f}" FolderPath="Properties\">
+      <Declaration><![CDATA[PROPERTY Response_WS : E_WaitSync]]></Declaration>
+      <Get Name="Get" Id="{2f5b85e5-6a38-4e0e-a6fe-8959f5a35dc9}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[Response_WS := _ResponseWaitSync;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+  </POU>
+</TcPlcObject>

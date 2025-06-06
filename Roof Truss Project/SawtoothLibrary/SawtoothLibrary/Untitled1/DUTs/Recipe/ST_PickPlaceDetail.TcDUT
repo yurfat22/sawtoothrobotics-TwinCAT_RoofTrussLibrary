@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_PickPlaceDetail" Id="{2a428ba2-0976-45e1-bb0d-92f7b4b6cd0f}">
+    <Declaration><![CDATA[TYPE
+    ST_PickPlaceDetail : STRUCT
+        MemberType : STRING;
+        XPos       : REAL;
+        YPos       : REAL;
+        ZPos       : REAL;
+        ZRot       : REAL;
+        ConvIndex  : INT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

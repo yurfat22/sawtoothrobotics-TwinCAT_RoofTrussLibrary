@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_SysConfig" Id="{dc1ff3db-86bf-48e7-a974-99161d1b62b3}">
+    <Declaration><![CDATA[TYPE
+    ST_SysConfig : STRUCT
+        TableLength_mm  : LREAL;
+        FastHandshakes  : BOOL;
+        VersionNumber   : USINT;
+        HardwareVersion : USINT;
+        OutfeedType     : STRING;
+        PressInterface  : INT;
+        UsedCarriages   : USINT;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

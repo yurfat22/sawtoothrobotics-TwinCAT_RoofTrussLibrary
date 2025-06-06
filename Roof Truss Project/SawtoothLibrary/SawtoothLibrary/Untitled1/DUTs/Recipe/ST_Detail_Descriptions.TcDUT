@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_Detail_Descriptions" Id="{7f285689-5356-4ebc-b14c-cf1c1063e295}">
+    <Declaration><![CDATA[TYPE
+    ST_Detail_Descriptions : STRUCT
+        Detail_Key : ARRAY[1..Global.MAX_DETAIL_COUNT] OF ST_KeyValue;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

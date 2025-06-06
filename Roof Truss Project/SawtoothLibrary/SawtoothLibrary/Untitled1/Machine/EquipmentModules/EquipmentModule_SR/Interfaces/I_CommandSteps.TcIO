@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_CommandSteps" Id="{5622a179-9d41-4cb7-962d-06a33dfb98f2}">
+    <Declaration><![CDATA[INTERFACE I_CommandSteps]]></Declaration>
+    <Method Name="AssemblyEnd" Id="{818ab77b-962e-4fb6-a5e7-6dcec8bbe4c1}">
+      <Declaration><![CDATA[METHOD AssemblyEnd : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="AssemblyStart" Id="{94786fe6-5b20-4fdd-99b8-7b11813b4a9e}">
+      <Declaration><![CDATA[METHOD AssemblyStart : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="Board" Id="{f1243003-10cd-4ba2-a5df-6c1c4d634ea1}">
+      <Declaration><![CDATA[METHOD Board : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="BoardInfo" Id="{5ee4d879-62a4-4eae-8b99-5e765a3268b7}">
+      <Declaration><![CDATA[METHOD BoardInfo : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="NailPlate" Id="{db76b8a1-b606-4e25-81e5-ec9f253e8fbf}">
+      <Declaration><![CDATA[METHOD NailPlate : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+    <Method Name="TrussInfo" Id="{90fdfe7b-fd9c-4f05-9a01-d32a876139eb}">
+      <Declaration><![CDATA[METHOD TrussInfo : BOOL
+VAR_INPUT
+END_VAR]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="ST_RecoveryBoardList" Id="{aa6e8fe8-9fd4-4438-8e97-0c96416e5d8c}">
+    <Declaration><![CDATA[TYPE
+    ST_RecoveryBoardList : STRUCT
+        BoardID : STRING;
+        Index   : STRING;
+        Length  : STRING;
+    END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

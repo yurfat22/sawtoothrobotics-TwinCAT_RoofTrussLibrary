@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <Itf Name="I_MyComponent" Id="{8709784e-273d-4e4c-a900-804277c14a47}">
+    <Declaration><![CDATA[INTERFACE I_MyComponent]]></Declaration>
+    <Property Name="SystemErrorPresent" Id="{c471a517-367e-4ab9-8a08-8f60e77893a1}">
+      <Declaration><![CDATA[PROPERTY SystemErrorPresent : BOOL]]></Declaration>
+      <Get Name="Get" Id="{89301abe-b181-4636-a617-ecacc7940fad}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{335d9f79-a4eb-4923-a20d-f88d00670403}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="SystemState" Id="{d609d1e5-e4e2-4903-aef2-7abc0b67e10c}">
+      <Declaration><![CDATA[PROPERTY SystemState : E_PMLState]]></Declaration>
+      <Get Name="Get" Id="{4647b906-14d7-420e-b551-083ae4c646dc}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{c3bd3efd-bb1f-4304-83db-910fdcb6f49f}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+  </Itf>
+</TcPlcObject>
