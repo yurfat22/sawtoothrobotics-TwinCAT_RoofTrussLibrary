@@ -37,6 +37,7 @@
     <SelectedLibraryCategories>
       <Id xmlns="">{4c30be10-0c29-4796-921e-62ecfda40191}</Id>
     </SelectedLibraryCategories>
+    <VirtualLibrary>true</VirtualLibrary>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="DUTs\DB_Logging\ST_EquipmentModuleLog.TcDUT">
@@ -517,10 +518,22 @@
     <Compile Include="Machine\HMI Connections\FB_ControlSource_HMI_Machine.TcPOU">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="PlcTask.TcTTO">
+    <Compile Include="Project Information\F_GetCompany.TcPOU">
       <SubType>Code</SubType>
+      <SystemCall>true</SystemCall>
+    </Compile>
+    <Compile Include="Project Information\F_GetTitle.TcPOU">
+      <SubType>Code</SubType>
+      <SystemCall>true</SystemCall>
+    </Compile>
+    <Compile Include="Project Information\F_GetVersion.TcPOU">
+      <SubType>Code</SubType>
+      <SystemCall>true</SystemCall>
     </Compile>
     <Compile Include="RecipeManager.TcRMO">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Version\Global_Version.TcGVL">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
@@ -607,6 +620,8 @@
     <Folder Include="Machine\FunctionBlocks\PulseGenerator\Interfaces" />
     <Folder Include="Machine\HMI Connections" />
     <Folder Include="Machine\FunctionBlocks" />
+    <Folder Include="Project Information" />
+    <Folder Include="Version" />
   </ItemGroup>
   <ItemGroup>
     <PlaceholderReference Include="RecipeManagement">
@@ -706,6 +721,9 @@
     <Content Include="Machine\Events\AMDTruss.tmc">
       <SubType>Content</SubType>
     </Content>
+    <None Include="Untitled1.tmc">
+      <SubType>Content</SubType>
+    </None>
   </ItemGroup>
   <ProjectExtensions>
     <PlcProjectOptions>
